@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Paperclip, Plus, X, Search, Filter, ExternalLink, FileText, File as FileIcon, Link as LinkIcon, FileImage } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 interface StudyNote {
   id: string;
@@ -18,6 +19,8 @@ interface StudyNote {
 }
 
 export default function StudyNotes() {
+  const { currentUser } = useAuth();
+  const isStudent = currentUser?.role === 'Student';
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   
@@ -96,12 +99,14 @@ export default function StudyNotes() {
           </h2>
           <p className="text-sm text-slate-500 mt-1">Organize shared links (Google Drive, OneDrive, PDFs, PPTs) by topic</p>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" /> Add Material
-        </button>
+        {!isStudent && (
+          <button
+            onClick={() => setShowAdd(true)}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" /> Add Material
+          </button>
+        )}
       </div>
 
       {/* Filter Tabs */}

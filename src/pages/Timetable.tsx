@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Plus, X } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 interface TimetableEntry {
   id: string;
@@ -9,6 +10,8 @@ interface TimetableEntry {
 }
 
 export default function Timetable() {
+  const { currentUser } = useAuth();
+  const isStudent = currentUser?.role === 'Student';
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [syllabus, setSyllabus] = useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -67,12 +70,14 @@ export default function Timetable() {
           </h2>
           <p className="text-sm text-slate-500 mt-1">Configure subjects for each period of the week.</p>
         </div>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg shadow-sm ${isEditing ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
-        >
-          {isEditing ? 'Save Timetable' : 'Edit Timetable'}
-        </button>
+        {!isStudent && (
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg shadow-sm ${isEditing ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+          >
+            {isEditing ? 'Save Timetable' : 'Edit Timetable'}
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">

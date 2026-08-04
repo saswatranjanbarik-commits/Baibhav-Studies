@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './lib/AuthContext';
 import Layout from './components/Layout';
@@ -20,6 +21,7 @@ import Tasks from './pages/Tasks';
 import Calendar from './pages/Calendar';
 import Timetable from './pages/Timetable';
 import ManageUsers from './pages/ManageUsers';
+import Appreciation from './pages/Appreciation';
 
 export default function App() {
   return (
@@ -42,6 +44,7 @@ export default function App() {
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/timetable" element={<Timetable />} />
               <Route path="/users" element={<ManageUsers />} />
+              <Route path="/appreciation" element={<Appreciation />} />
               <Route path="*" element={<Dashboard />} />
             </Route>
           </Route>

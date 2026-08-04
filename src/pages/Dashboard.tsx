@@ -1,9 +1,32 @@
 import React from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { CheckCircle2, Globe2, BarChart3, Edit3, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Globe2, BarChart3, Edit3, RefreshCw, Star } from 'lucide-react';
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
+  const [totalPoints, setTotalPoints] = React.useState(0);
+  
+  const [upcomingEvent, setUpcomingEvent] = React.useState({ name: 'Term-I', date: '2026-09-14' });
+  const [isEditingEvent, setIsEditingEvent] = React.useState(false);
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem('dugu_appreciation');
+    if (saved) {
+      const records = JSON.parse(saved);
+      setTotalPoints(records.reduce((sum: number, r: any) => sum + r.points, 0));
+    }
+    const savedEvent = localStorage.getItem('dugu_upcoming_event');
+    if (savedEvent) setUpcomingEvent(JSON.parse(savedEvent));
+  }, []);
+
+  const saveEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('dugu_upcoming_event', JSON.stringify(upcomingEvent));
+    setIsEditingEvent(false);
+  };
+
+  const daysLeft = Math.ceil((new Date(upcomingEvent.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+
   
   const subjects = [
     { name: 'English', progress: 0, total: 11, pct: 0, color: 'bg-indigo-600' },
@@ -22,7 +45,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="mb-4">
         <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
-          <span className="text-2xl">👋</span> Welcome, {currentUser?.email?.split('@')[0] || 'Saswat'}!
+          <span className="text-2xl">👋</span> Welcome, {currentUser?.username || 'User'}!
         </h2>
         <p className="text-sm text-slate-500 mt-1">
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -30,22 +53,94 @@ export default function Dashboard() {
       </div>
 
       {/* Exam Banner */}
-      <div className="bg-[#1F4E79] rounded-xl p-4 text-white flex justify-between items-center mb-6 shadow-sm">
+      <div className="bg-[#1F4E79] rounded-xl p-4 text-white flex justify-between items-center mb-6 shadow-sm relative group">
         <div>
-          <div className="text-xs text-indigo-200 uppercase tracking-wider font-semibold mb-1">Next Exam</div>
+          <div className="text-xs text-indigo-200 uppercase tracking-wider font-semibold mb-1">Next Event</div>
           <div className="text-xl font-bold flex items-center gap-2">
-            📝 Term-I
+            📅 {upcomingEvent.name}
           </div>
-          <div className="text-xs text-indigo-200 mt-1">2026-09-14</div>
+          <div className="text-xs text-indigo-200 mt-1">{upcomingEvent.date}</div>
         </div>
-        <div className="text-right">
-          <div className="text-4xl font-black leading-none">43</div>
-          <div className="text-xs text-indigo-200 mt-1 font-medium">days left</div>
+        <div className="text-right flex items-center gap-4">
+          <div className="text-right">
+            <div className="text-4xl font-black leading-none">{daysLeft > 0 ? daysLeft : 0}</div>
+            <div className="text-xs text-indigo-200 mt-1 font-medium">{daysLeft === 1 ? 'day left' : 'days left'}</div>
+          </div>
+          {(currentUser?.role === 'Admin' || currentUser?.role === 'Teacher') && (
+            <button
+              onClick={() => setIsEditingEvent(true)}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors ml-4"
+              title="Edit Upcoming Event"
+            >
+              <Edit3 className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
 
+      {isEditingEvent && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="text-lg font-bold text-slate-900">Edit Upcoming Event</h3>
+              <button onClick={() => setIsEditingEvent(false)} className="text-slate-400 hover:text-slate-600">
+                <span className="sr-only">Close</span>
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={saveEvent} className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Event Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={upcomingEvent.name}
+                    onChange={e => setUpcomingEvent({ ...upcomingEvent, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="e.g. Term-I Exams"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={upcomingEvent.date}
+                    onChange={e => setUpcomingEvent({ ...upcomingEvent, date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingEvent(false)}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
+                >
+                  Save Event
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-yellow-500">
+          <div className="text-3xl font-black text-yellow-500 flex items-center gap-1">
+            {totalPoints} <Star className="h-5 w-5 fill-current" />
+          </div>
+          <div className="text-xs text-slate-500 font-medium mt-1">Total Points</div>
+        </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-indigo-600">
           <div className="text-3xl font-black text-indigo-600">4</div>
           <div className="text-xs text-slate-500 font-medium mt-1">Topics Logged</div>

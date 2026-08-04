@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Target, Plus, X, Search, Filter, Layers, CheckCircle2, ChevronRight, ChevronLeft, Trash2, Upload, Download } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 type ItemType = 'flashcard' | 'quiz';
 
@@ -22,7 +23,9 @@ interface LearningItem {
 }
 
 export default function Flashcards() {
-  const [activeTab, setActiveTab] = useState<'manage' | 'flashcards' | 'quiz'>('manage');
+  const { currentUser } = useAuth();
+  const isStudent = currentUser?.role === 'Student';
+  const [activeTab, setActiveTab] = useState<'manage' | 'flashcards' | 'quiz'>(isStudent ? 'flashcards' : 'manage');
   const [items, setItems] = useState<LearningItem[]>([]);
   const [syllabus, setSyllabus] = useState<any[]>([]);
   
@@ -207,6 +210,41 @@ export default function Flashcards() {
       answered: {}
     });
     setActiveTab(type === 'flashcard' ? 'flashcards' : 'quiz');
+
+    // Automatically update daily log
+    if (shuffled.length > 0) {
+      try {
+        const savedLogs = localStorage.getItem('dugu_daily_logs');
+        const logs = savedLogs ? JSON.parse(savedLogs) : [];
+        
+        // Group by unique topics to log them
+        const uniqueTopics = new Set<string>();
+        
+        shuffled.forEach(item => {
+          const topicKey = `${item.subjectId}|${item.chapterId}|${item.topicId}`;
+          if (!uniqueTopics.has(topicKey)) {
+            uniqueTopics.add(topicKey);
+            const newLog = {
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+              date: new Date().toISOString().split('T')[0],
+              subjectId: item.subjectId,
+              subjectName: item.subjectName,
+              chapterId: item.chapterId,
+              chapterName: item.chapterName,
+              topicId: item.topicId,
+              topicName: item.topicName,
+              status: 'Completed',
+              notes: type === 'flashcard' ? 'Practice - Flashcards' : 'Assessment - Quiz'
+            };
+            logs.push(newLog);
+          }
+        });
+        
+        localStorage.setItem('dugu_daily_logs', JSON.stringify(logs));
+      } catch (e) {
+        console.error("Failed to update daily log", e);
+      }
+    }
   };
 
   const handleNext = () => {
@@ -274,14 +312,16 @@ export default function Flashcards() {
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
         <div className="flex border-b border-slate-200">
-          <button
-            onClick={() => { setActiveTab('manage'); setPracticeSession(null); }}
-            className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-colors ${
-              activeTab === 'manage' ? 'border-red-500 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Manage Content
-          </button>
+          {!isStudent && (
+            <button
+              onClick={() => { setActiveTab('manage'); setPracticeSession(null); }}
+              className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-colors ${
+                activeTab === 'manage' ? 'border-red-500 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Manage Content
+            </button>
+          )}
           <button
             onClick={() => { setActiveTab('flashcards'); setPracticeSession(null); }}
             className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-colors ${

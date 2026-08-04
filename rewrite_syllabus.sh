@@ -1,3 +1,4 @@
+cat << '' > src/pages/Syllabus.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
@@ -200,11 +201,11 @@ export default function Syllabus() {
       }
     };
     reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const processCSV = (csv: string) => {
-    const lines = csv.split("\n").filter(line => line.trim() !== "");
+    const lines = csv.split('\n').filter(line => line.trim() !== '');
     if (lines.length < 2) {
       alert("Invalid CSV format or empty file.");
       return;
@@ -242,26 +243,26 @@ export default function Syllabus() {
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i];
-      const parts = line.split(",").map(s => s.trim().replace(/^"|"$/g, ""));
+      const parts = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''));
       if (parts.length < 5) continue;
       
-      const startDate = parts[0] || new Date().toISOString().split("T")[0];
-      const weekNo = parts[1] || "1";
-      const subjectName = parts[2] || "Unknown Subject";
-      const planType = parts[3] || "Self Study";
-      const rawTopic = parts[4] || "General";
-      const statusRaw = (parts[5] || "Pending").toLowerCase();
-      const status = statusRaw.includes("complete") ? "Completed" : statusRaw.includes("progress") ? "In Progress" : "Pending";
-      const learningIndex = parts[6] || "1.1";
-      const doubts = parts[7] || "";
+      const startDate = parts[0] || new Date().toISOString().split('T')[0];
+      const weekNo = parts[1] || '1';
+      const subjectName = parts[2] || 'Unknown Subject';
+      const planType = parts[3] || 'Self Study';
+      const rawTopic = parts[4] || 'General';
+      const statusRaw = (parts[5] || 'Pending').toLowerCase();
+      const status = statusRaw.includes('complete') ? 'Completed' : statusRaw.includes('progress') ? 'In Progress' : 'Pending';
+      const learningIndex = parts[6] || '1.1';
+      const doubts = parts[7] || '';
 
-      let chapterName = "General Chapter";
+      let chapterName = 'General Chapter';
       let topicName = rawTopic;
 
-      if (rawTopic.includes("-")) {
-        const split = rawTopic.split("-");
+      if (rawTopic.includes('-')) {
+        const split = rawTopic.split('-');
         chapterName = split[0].trim();
-        topicName = split.slice(1).join("-").trim();
+        topicName = split.slice(1).join('-').trim();
       }
 
       const subject = getOrCreateSubject(subjectName);
@@ -287,9 +288,9 @@ export default function Syllabus() {
 
     saveSubjects(currentSyllabus);
     if (newPlanEntries.length > 0) {
-      const savedEntries = localStorage.getItem("dugu_study_plan");
+      const savedEntries = localStorage.getItem('dugu_study_plan');
       const existingEntries = savedEntries ? JSON.parse(savedEntries) : [];
-      localStorage.setItem("dugu_study_plan", JSON.stringify([...newPlanEntries, ...existingEntries]));
+      localStorage.setItem('dugu_study_plan', JSON.stringify([...newPlanEntries, ...existingEntries]));
     }
     
     setImportSuccess(true);
@@ -346,8 +347,8 @@ export default function Syllabus() {
             onClick={() => setActiveSubjectId(s.id)}
             className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
               activeSubjectId === s.id 
-                ? "bg-indigo-600 text-white shadow-sm" 
-                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                ? 'bg-indigo-600 text-white shadow-sm' 
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
             {s.name}
@@ -359,7 +360,7 @@ export default function Syllabus() {
         {/* Active Subject Header */}
         <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 rounded-t-xl">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">{activeSubject?.name || "Select a subject"}</h3>
+            <h3 className="text-lg font-bold text-slate-900">{activeSubject?.name || 'Select a subject'}</h3>
             <p className="text-sm text-slate-500">{activeSubject?.chapters.length || 0} Chapters in this subject</p>
           </div>
           {!isStudent && activeSubject && (
@@ -605,3 +606,4 @@ export default function Syllabus() {
     </div>
   );
 }
+

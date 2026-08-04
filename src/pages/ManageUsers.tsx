@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, X, Search, Edit2, Trash2, Globe, Shield, User, UserCheck, Key, Lock } from 'lucide-react';
+import { Users, Plus, X, Search, Edit2, Trash2, Globe, Shield, User, UserCheck, Key, Lock, AlertTriangle } from 'lucide-react';
 
 interface UserObj {
   id: string;
@@ -133,6 +133,21 @@ export default function ManageUsers() {
     u.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleClearData = () => {
+    if (confirm("WARNING: This will clear ALL app data (except users) for all users! Are you absolutely sure?")) {
+      const usersBackup = localStorage.getItem('dugu_users_v2');
+      const currentUserBackup = localStorage.getItem('dugu_currentUser_v2');
+      
+      localStorage.clear();
+      
+      if (usersBackup) localStorage.setItem('dugu_users_v2', usersBackup);
+      if (currentUserBackup) localStorage.setItem('dugu_currentUser_v2', currentUserBackup);
+      
+      alert("All app data has been cleared.");
+      window.location.reload();
+    }
+  };
+
   const getRoleIcon = (role: string) => {
     switch(role) {
       case 'Admin': return <Shield className="h-4 w-4 text-purple-600" />;
@@ -160,16 +175,24 @@ export default function ManageUsers() {
           </h2>
           <p className="text-sm text-slate-500 mt-1">Add, remove, and configure roles (Admin, Teacher, Student) across different timezones.</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingUser(null);
-            setNewUser({ role: 'Student', timezone: 'UTC (Coordinated Universal Time)' });
-            setShowAddModal(true);
-          }}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" /> Add User
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleClearData}
+            className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 text-sm font-semibold rounded-lg hover:bg-red-100 shadow-sm flex items-center gap-2 transition-colors"
+          >
+            <AlertTriangle className="h-4 w-4" /> Clear All Data
+          </button>
+          <button
+            onClick={() => {
+              setEditingUser(null);
+              setNewUser({ role: 'Student', timezone: 'UTC (Coordinated Universal Time)' });
+              setShowAddModal(true);
+            }}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2 transition-colors"
+          >
+            <Plus className="h-4 w-4" /> Add User
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">

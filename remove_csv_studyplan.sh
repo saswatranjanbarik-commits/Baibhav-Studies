@@ -1,5 +1,6 @@
+cat << 'INNER_EOF' > src/pages/StudyPlan.tsx
 import React, { useState, useEffect } from 'react';
-import { PenTool, Plus, X, Search, Filter, Clock } from 'lucide-react';
+import { PenTool, Plus, X, Search, Filter, Clock, Upload, CheckCircle2 } from 'lucide-react';
 
 type PlanType = 'Teaching' | 'Self Study' | 'Quiz' | 'Flashcard' | 'Task' | 'Assessment';
 
@@ -58,7 +59,7 @@ export default function StudyPlan() {
     if (!newEntry.subjectId || !newEntry.chapterId || !newEntry.topicId) return;
 
     const entry: StudyPlanEntry = {
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       subjectId: newEntry.subjectId,
       subjectName: activeSubject?.name || '',
       chapterId: newEntry.chapterId,
@@ -67,7 +68,7 @@ export default function StudyPlan() {
       topicName: activeTopic?.name || '',
       subTopicId: newEntry.subTopicId,
       subTopicName: activeTopic?.subTopics?.find((st: any) => st.id === newEntry.subTopicId)?.name || '',
-      status: newEntry.status || 'Pending',
+      status: newEntry.status as any || 'Pending',
       startDate: newEntry.startDate || new Date().toISOString().split('T')[0],
       timeFrom: newEntry.timeFrom,
       timeTo: newEntry.timeTo,
@@ -103,6 +104,7 @@ export default function StudyPlan() {
     }
   };
 
+
   return (
     <div className="max-w-7xl mx-auto pb-12">
       {/* Header */}
@@ -113,14 +115,16 @@ export default function StudyPlan() {
           </h2>
           <p className="text-sm text-slate-500 mt-1">Create and manage your weekly and monthly study targets.</p>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" /> Add Plan Target
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowAdd(true)}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2 transition-colors"
+          >
+            <Plus className="h-4 w-4" /> Add Plan Target
+          </button>
+        </div>
       </div>
-
+      
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-4 bg-slate-50">
           <div className="relative flex-1">
@@ -143,7 +147,7 @@ export default function StudyPlan() {
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/4">Target Details</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Schedule</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Index</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Index / Doubt</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
@@ -184,8 +188,9 @@ export default function StudyPlan() {
                         {entry.planType || 'Self Study'}
                       </span>
                     </td>
-                    <td className="p-4 text-sm text-slate-600 font-medium">
-                      {entry.learningIndex}
+                    <td className="p-4 text-sm text-slate-600">
+                      <div className="font-medium text-indigo-600">{entry.learningIndex}</div>
+                      {entry.doubts && <div className="text-xs text-red-500 mt-1">{entry.doubts}</div>}
                     </td>
                     <td className="p-4 text-center">
                       <button
@@ -374,3 +379,5 @@ export default function StudyPlan() {
     </div>
   );
 }
+INNER_EOF
+bash remove_csv_studyplan.sh

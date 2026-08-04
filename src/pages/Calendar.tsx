@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, X, Clock, Tag, MapPin, Trash2 } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 interface Event {
   id: string;
@@ -21,6 +22,8 @@ interface Task {
 }
 
 export default function Calendar() {
+  const { currentUser } = useAuth();
+  const isStudent = currentUser?.role === 'Student';
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<Event[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -186,15 +189,17 @@ export default function Calendar() {
           </h2>
           <p className="text-sm text-slate-500 mt-1">Schedule study sessions, track classes, and see upcoming tasks.</p>
         </div>
-        <button
-          onClick={() => {
-            setNewEvent({ ...newEvent, date: new Date().toISOString().split('T')[0] });
-            setShowAddModal(true);
-          }}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" /> Add Event
-        </button>
+        {!isStudent && (
+          <button
+            onClick={() => {
+              setNewEvent({ ...newEvent, date: new Date().toISOString().split('T')[0] });
+              setShowAddModal(true);
+            }}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" /> Add Event
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">

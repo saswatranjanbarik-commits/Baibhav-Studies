@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+const fs = require('fs');
+const content = `import React, { useState, useEffect, useRef } from 'react';
 import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
@@ -166,7 +167,7 @@ export default function Syllabus() {
   };
 
   const deleteNode = (type: 'chapter' | 'topic' | 'subtopic', id: string) => {
-    if (!confirm(`Are you sure you want to delete this ${type}?`)) return;
+    if (!confirm(\`Are you sure you want to delete this \${type}?\`)) return;
 
     let updatedSubjects = [...subjects];
     const subIdx = updatedSubjects.findIndex(s => s.id === activeSubjectId);
@@ -204,7 +205,7 @@ export default function Syllabus() {
   };
 
   const processCSV = (csv: string) => {
-    const lines = csv.split("\n").filter(line => line.trim() !== "");
+    const lines = csv.split("\\n").filter(line => line.trim() !== "");
     if (lines.length < 2) {
       alert("Invalid CSV format or empty file.");
       return;
@@ -216,7 +217,7 @@ export default function Syllabus() {
     const getOrCreateSubject = (name: string) => {
       let sub = currentSyllabus.find(s => s.name.toLowerCase() === name.toLowerCase());
       if (!sub) {
-        sub = { id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name, chapters: [] };
+        sub = { id: \`sub_\${Date.now()}_\${Math.random().toString(36).substr(2, 5)}\`, name, chapters: [] };
         currentSyllabus.push(sub);
       }
       return sub;
@@ -225,7 +226,7 @@ export default function Syllabus() {
     const getOrCreateChapter = (sub: any, name: string) => {
       let ch = sub.chapters.find((c: any) => c.name.toLowerCase() === name.toLowerCase());
       if (!ch) {
-        ch = { id: `ch_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name, topics: [] };
+        ch = { id: \`ch_\${Date.now()}_\${Math.random().toString(36).substr(2, 5)}\`, name, topics: [] };
         sub.chapters.push(ch);
       }
       return ch;
@@ -234,7 +235,7 @@ export default function Syllabus() {
     const getOrCreateTopic = (ch: any, name: string) => {
       let tp = ch.topics.find((t: any) => t.name.toLowerCase() === name.toLowerCase());
       if (!tp) {
-        tp = { id: `tp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name, subTopics: [] };
+        tp = { id: \`tp_\${Date.now()}_\${Math.random().toString(36).substr(2, 5)}\`, name, subTopics: [] };
         ch.topics.push(tp);
       }
       return tp;
@@ -344,11 +345,11 @@ export default function Syllabus() {
           <button
             key={s.id}
             onClick={() => setActiveSubjectId(s.id)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
+            className={\`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors \${
               activeSubjectId === s.id 
                 ? "bg-indigo-600 text-white shadow-sm" 
                 : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-            }`}
+            }\`}
           >
             {s.name}
           </button>
@@ -536,7 +537,7 @@ export default function Syllabus() {
                   value={newNodeName}
                   onChange={e => setNewNodeName(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                  placeholder={`Enter ${showAddNode.type} name...`}
+                  placeholder={\`Enter \${showAddNode.type} name...\`}
                 />
               </div>
               <div className="mt-6 flex justify-end gap-3">
@@ -580,7 +581,7 @@ export default function Syllabus() {
                   value={editNode.name}
                   onChange={e => setEditNode({ ...editNode, name: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                  placeholder={`Enter ${editNode.type} name...`}
+                  placeholder={\`Enter \${editNode.type} name...\`}
                 />
               </div>
               <div className="mt-6 flex justify-end gap-3">
@@ -605,3 +606,5 @@ export default function Syllabus() {
     </div>
   );
 }
+`;
+fs.writeFileSync('src/pages/Syllabus.tsx', content);
