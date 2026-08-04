@@ -59,7 +59,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     // Simple check against stored users
-    const user = users.find((u: any) => u.username === username && u.password === password);
+    const user = users.find((u: any) => 
+      u.username.toLowerCase().trim() === username.toLowerCase().trim() && 
+      u.password === password
+    );
     
     if (user) {
       const appUser = { id: user.id, username: user.username, role: user.role, timezone: user.timezone };
