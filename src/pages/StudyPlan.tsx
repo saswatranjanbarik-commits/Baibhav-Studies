@@ -55,7 +55,7 @@ export default function StudyPlan() {
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEntry.subjectId || !newEntry.chapterId || !newEntry.topicId) return;
+    if (!newEntry.subjectId || !newEntry.chapterId) return;
 
     const entry: StudyPlanEntry = {
       id: Date.now().toString(),
@@ -252,9 +252,8 @@ export default function StudyPlan() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Topic *</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Topic</label>
                   <select
-                    required
                     disabled={!activeChapter}
                     value={newEntry.topicId || ''}
                     onChange={e => setNewEntry({ ...newEntry, topicId: e.target.value, subTopicId: '' })}

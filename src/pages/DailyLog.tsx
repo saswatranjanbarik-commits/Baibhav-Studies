@@ -155,8 +155,8 @@ export default function DailyLog() {
     };
 
     if (log.category === 'Rock') {
-      if (!newLog.subjectId || !newLog.chapterId || !newLog.topicId) {
-        alert("Please select Subject, Chapter and Topic");
+      if (!newLog.subjectId || !newLog.chapterId) {
+        alert("Please select Subject and Chapter");
         return;
       }
       log.subjectId = newLog.subjectId;
@@ -596,9 +596,8 @@ export default function DailyLog() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Topic *</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Topic</label>
                     <select
-                      required
                       disabled={!activeChapter}
                       value={newLog.topicId || ''}
                       onChange={e => setNewLog({ ...newLog, topicId: e.target.value, subTopicId: '' })}

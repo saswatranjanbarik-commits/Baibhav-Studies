@@ -16,6 +16,7 @@ interface Topic {
 interface Chapter {
   id: string;
   name: string;
+  term?: 'Term-1' | 'Term-2' | 'Both';
   topics: Topic[];
 }
 
@@ -50,8 +51,9 @@ export default function Syllabus() {
 
   const [showAddNode, setShowAddNode] = useState<{ type: 'chapter' | 'topic' | 'subtopic', parentId?: string } | null>(null);
   const [newNodeName, setNewNodeName] = useState('');
+  const [newNodeTerm, setNewNodeTerm] = useState<'Term-1' | 'Term-2' | 'Both'>('Both');
 
-  const [editNode, setEditNode] = useState<{ type: 'chapter' | 'topic' | 'subtopic', id: string, name: string } | null>(null);
+  const [editNode, setEditNode] = useState<{ type: 'chapter' | 'topic' | 'subtopic', id: string, name: string, term?: 'Term-1' | 'Term-2' | 'Both' } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importSuccess, setImportSuccess] = useState(false);
@@ -104,6 +106,7 @@ export default function Syllabus() {
       updatedSubjects[subIdx].chapters.push({
         id: generateId(),
         name: newNodeName,
+        term: newNodeTerm,
         topics: []
       });
     } else if (showAddNode.type === 'topic') {
@@ -146,7 +149,10 @@ export default function Syllabus() {
 
     if (editNode.type === 'chapter') {
       const idx = updatedSubjects[subIdx].chapters.findIndex(c => c.id === editNode.id);
-      if (idx !== -1) updatedSubjects[subIdx].chapters[idx].name = editNode.name;
+      if (idx !== -1) {
+        updatedSubjects[subIdx].chapters[idx].name = editNode.name;
+        updatedSubjects[subIdx].chapters[idx].term = editNode.term;
+      }
     } else if (editNode.type === 'topic') {
       updatedSubjects[subIdx].chapters.forEach(ch => {
         const idx = ch.topics.findIndex(t => t.id === editNode.id);
@@ -413,6 +419,7 @@ export default function Syllabus() {
                       {expandedNodes[chapter.id] ? <ChevronDown className="h-5 w-5 text-slate-400" /> : <ChevronRight className="h-5 w-5 text-slate-400" />}
                       <span className="font-bold text-slate-800">{chapter.name}</span>
                       <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full ml-2">Chapter</span>
+                      {chapter.term && <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full ml-2 font-bold">{chapter.term}</span>}
                     </div>
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       {!isStudent && (
@@ -420,7 +427,7 @@ export default function Syllabus() {
                           <button onClick={() => setShowAddNode({ type: 'topic', parentId: chapter.id })} className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded">
                             + Topic
                           </button>
-                          <button onClick={() => setEditNode({ type: 'chapter', id: chapter.id, name: chapter.name })} className="text-slate-400 hover:text-indigo-600 p-1.5">
+                          <button onClick={() => setEditNode({ type: 'chapter', id: chapter.id, name: chapter.name, term: chapter.term || 'Both' })} className="text-slate-400 hover:text-indigo-600 p-1.5">
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button onClick={() => deleteNode('chapter', chapter.id)} className="text-slate-400 hover:text-red-600 p-1.5">
@@ -551,17 +558,33 @@ export default function Syllabus() {
             </div>
             
             <form onSubmit={handleAddNode} className="p-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 capitalize">{showAddNode.type} Name</label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={newNodeName}
-                  onChange={e => setNewNodeName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                  placeholder={`Enter ${showAddNode.type} name...`}
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5 capitalize">{showAddNode.type} Name</label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={newNodeName}
+                    onChange={e => setNewNodeName(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder={`Enter ${showAddNode.type} name...`}
+                  />
+                </div>
+                {showAddNode.type === 'chapter' && (
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Term</label>
+                    <select
+                      value={newNodeTerm}
+                      onChange={e => setNewNodeTerm(e.target.value as any)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="Both">Both</option>
+                      <option value="Term-1">Term-1</option>
+                      <option value="Term-2">Term-2</option>
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="mt-6 flex justify-end gap-3">
                 <button
@@ -595,17 +618,33 @@ export default function Syllabus() {
             </div>
             
             <form onSubmit={handleEditNode} className="p-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 capitalize">{editNode.type} Name</label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={editNode.name}
-                  onChange={e => setEditNode({ ...editNode, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                  placeholder={`Enter ${editNode.type} name...`}
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5 capitalize">{editNode.type} Name</label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={editNode.name}
+                    onChange={e => setEditNode({ ...editNode, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder={`Enter ${editNode.type} name...`}
+                  />
+                </div>
+                {editNode.type === 'chapter' && (
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Term</label>
+                    <select
+                      value={editNode.term || 'Both'}
+                      onChange={e => setEditNode({ ...editNode, term: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="Both">Both</option>
+                      <option value="Term-1">Term-1</option>
+                      <option value="Term-2">Term-2</option>
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="mt-6 flex justify-end gap-3">
                 <button
