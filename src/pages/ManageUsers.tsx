@@ -45,6 +45,7 @@ const DEFAULT_USERS: UserObj[] = [
   {
     id: '1',
     username: 'Saswat',
+    password: 'admin123',
     role: 'Admin',
     timezone: 'UTC+05:30 (Indian Standard Time)'
   }

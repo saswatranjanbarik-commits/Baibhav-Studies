@@ -23,11 +23,11 @@ export default function Layout() {
         
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
-            <div className="font-bold text-sm leading-tight">{currentUser?.email?.split('@')[0] || 'User'}</div>
-            <div className="text-xs text-indigo-200">IST +5:30 &middot; {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div className="font-bold text-sm leading-tight">{currentUser?.username || 'User'}</div>
+            <div className="text-xs text-indigo-200">{currentUser?.timezone?.split(' ')[0] || 'Time'} &middot; {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm">
-            {(currentUser?.email?.[0] || 'U').toUpperCase()}
+            {(currentUser?.username?.[0] || 'U').toUpperCase()}
           </div>
           <button 
             onClick={() => logout()}
