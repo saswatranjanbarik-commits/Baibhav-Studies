@@ -1,22 +1,104 @@
 import React from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { CheckCircle2, Globe2, BarChart3, Edit3, RefreshCw, Star } from 'lucide-react';
+import { BookOpen, Star, BarChart3, CheckCircle2, Clock, Calendar as CalendarIcon, RefreshCw, Trophy, Target, Sparkles, Globe2, Edit3, X } from 'lucide-react';
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
-  const [totalPoints, setTotalPoints] = React.useState(0);
   
-  const [upcomingEvent, setUpcomingEvent] = React.useState({ name: 'Term-I', date: '2026-09-14' });
+  const [totalPoints, setTotalPoints] = React.useState(0);
+  const [upcomingEvent, setUpcomingEvent] = React.useState({ name: 'Upcoming Event', date: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0] });
   const [isEditingEvent, setIsEditingEvent] = React.useState(false);
+  
+  const [topicsLogged, setTopicsLogged] = React.useState(0);
+  const [revisionsDue, setRevisionsDue] = React.useState(0);
+  const [pendingTasks, setPendingTasks] = React.useState(0);
+  const [overallProgress, setOverallProgress] = React.useState(0);
+  const [recentTopics, setRecentTopics] = React.useState<any[]>([]);
+  const [subjectProgress, setSubjectProgress] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    const saved = localStorage.getItem('dugu_appreciation');
-    if (saved) {
-      const records = JSON.parse(saved);
-      setTotalPoints(records.reduce((sum: number, r: any) => sum + r.points, 0));
+    // 1. Load points
+    const savedAppreciation = localStorage.getItem('dugu_appreciation');
+    if (savedAppreciation) {
+      const records = JSON.parse(savedAppreciation);
+      setTotalPoints(records.reduce((sum: number, r: any) => sum + (Number(r.points) || 0), 0));
     }
+    
+    // 2. Load Event
     const savedEvent = localStorage.getItem('dugu_upcoming_event');
     if (savedEvent) setUpcomingEvent(JSON.parse(savedEvent));
+
+    // 3. Load daily logs for "Topics Logged" and "Recent Topics"
+    const savedLogs = localStorage.getItem('dugu_daily_log');
+    let logs = [];
+    if (savedLogs) {
+      logs = JSON.parse(savedLogs);
+      setTopicsLogged(logs.length);
+      setRecentTopics(logs.slice(0, 3)); // top 3 recent
+    }
+
+    // 4. Load Revisions
+    const savedRevisions = localStorage.getItem('dugu_revisions');
+    if (savedRevisions) {
+      const revs = JSON.parse(savedRevisions);
+      // count pending revisions due today or earlier
+      const today = new Date().toISOString().split('T')[0];
+      const due = revs.filter((r: any) => r.status === 'Pending' && r.nextRevisionDate <= today);
+      setRevisionsDue(due.length);
+    }
+
+    // 5. Load Tasks
+    const savedTasks = localStorage.getItem('dugu_tasks');
+    if (savedTasks) {
+      const tasks = JSON.parse(savedTasks);
+      const pending = tasks.filter((t: any) => t.status === 'Pending');
+      setPendingTasks(pending.length);
+    }
+
+    // 6. Calculate Progress based on Study Plan
+    const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
+    const savedPlan = localStorage.getItem('dugu_study_plan');
+    
+    if (savedSyllabus) {
+      const syllabus = JSON.parse(savedSyllabus);
+      let plan = [];
+      if (savedPlan) plan = JSON.parse(savedPlan);
+      
+      const colors = ['bg-indigo-600', 'bg-purple-600', 'bg-blue-500', 'bg-green-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500'];
+      
+      let totalItems = 0;
+      let completedItems = 0;
+      
+      const subProgs = syllabus.map((sub: any, idx: number) => {
+        // Count topics in this subject
+        let subTotalTopics = 0;
+        sub.chapters?.forEach((ch: any) => {
+          subTotalTopics += ch.topics?.length || 0;
+        });
+        
+        // Count completed in study plan for this subject
+        const completedInSub = plan.filter((p: any) => p.subjectId === sub.id && p.status === 'Completed').length;
+        
+        // If syllabus doesn't have topics defined yet, we'll just use the study plan totals as a rough metric or 0
+        const displayTotal = Math.max(subTotalTopics, plan.filter((p: any) => p.subjectId === sub.id).length);
+        
+        totalItems += displayTotal;
+        completedItems += completedInSub;
+        
+        const pct = displayTotal > 0 ? Math.round((completedInSub / displayTotal) * 100) : 0;
+        
+        return {
+          name: sub.name,
+          progress: completedInSub,
+          total: displayTotal,
+          pct: pct,
+          color: colors[idx % colors.length]
+        };
+      });
+      
+      setSubjectProgress(subProgs);
+      setOverallProgress(totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0);
+    }
   }, []);
 
   const saveEvent = (e: React.FormEvent) => {
@@ -27,28 +109,15 @@ export default function Dashboard() {
 
   const daysLeft = Math.ceil((new Date(upcomingEvent.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
 
-  
-  const subjects = [
-    { name: 'English', progress: 0, total: 11, pct: 0, color: 'bg-indigo-600' },
-    { name: 'Hindi', progress: 3, total: 15, pct: 20, color: 'bg-purple-600' },
-    { name: 'Odia', progress: 0, total: 12, pct: 0, color: 'bg-amber-700' },
-    { name: 'Mathematics', progress: 0, total: 23, pct: 0, color: 'bg-teal-700' },
-    { name: 'Science', progress: 0, total: 9, pct: 0, color: 'bg-green-700' },
-    { name: 'Social Studies', progress: 0, total: 5, pct: 0, color: 'bg-orange-600' },
-    { name: 'Computer Science', progress: 0, total: 8, pct: 0, color: 'bg-blue-800' },
-    { name: 'Moral Science', progress: 0, total: 26, pct: 0, color: 'bg-purple-800' },
-    { name: 'General Knowledge', progress: 0, total: 13, pct: 0, color: 'bg-slate-700' },
-  ];
-
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-4">
-        <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
-          <span className="text-2xl">👋</span> Welcome, {currentUser?.username || 'User'}!
+    <div className="max-w-7xl mx-auto pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Welcome Header */}
+      <div className="mb-8">
+        <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+          <span className="text-4xl">👋</span> Welcome, {currentUser?.username || 'User'}!
         </h2>
-        <p className="text-sm text-slate-500 mt-1">
-          {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        <p className="text-slate-500 font-medium mt-1">
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
 
@@ -85,7 +154,7 @@ export default function Dashboard() {
               <h3 className="text-lg font-bold text-slate-900">Edit Upcoming Event</h3>
               <button onClick={() => setIsEditingEvent(false)} className="text-slate-400 hover:text-slate-600">
                 <span className="sr-only">Close</span>
-                &times;
+                <X className="h-5 w-5" />
               </button>
             </div>
             
@@ -142,19 +211,19 @@ export default function Dashboard() {
           <div className="text-xs text-slate-500 font-medium mt-1">Total Points</div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-indigo-600">
-          <div className="text-3xl font-black text-indigo-600">4</div>
+          <div className="text-3xl font-black text-indigo-600">{topicsLogged}</div>
           <div className="text-xs text-slate-500 font-medium mt-1">Topics Logged</div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-orange-600">
-          <div className="text-3xl font-black text-orange-600">0</div>
+          <div className="text-3xl font-black text-orange-600">{revisionsDue}</div>
           <div className="text-xs text-slate-500 font-medium mt-1">Revisions Due</div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-teal-700">
-          <div className="text-3xl font-black text-teal-700">3%</div>
+          <div className="text-3xl font-black text-teal-700">{overallProgress}%</div>
           <div className="text-xs text-slate-500 font-medium mt-1">Overall Progress</div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-purple-600">
-          <div className="text-3xl font-black text-purple-600">0</div>
+          <div className="text-3xl font-black text-purple-600">{pendingTasks}</div>
           <div className="text-xs text-slate-500 font-medium mt-1">Pending Tasks</div>
         </div>
       </div>
@@ -168,12 +237,12 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-green-500"></div>
             <div>
-              <div className="text-sm font-bold text-slate-900">Saswat</div>
-              <div className="text-xs text-slate-500">WAT +1 (West Africa)</div>
+              <div className="text-sm font-bold text-slate-900">{currentUser?.username || 'User'}</div>
+              <div className="text-xs text-slate-500">{currentUser?.timezone || 'Timezone'}</div>
             </div>
           </div>
           <div className="text-sm font-bold text-indigo-600">
-            {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       </div>
@@ -185,20 +254,24 @@ export default function Dashboard() {
             <BarChart3 className="h-4 w-4 text-green-600" /> Subject Progress
           </h3>
           <div className="space-y-4">
-            {subjects.map((sub) => (
-              <div key={sub.name}>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="font-bold text-slate-700">{sub.name}</span>
-                  <span className="text-slate-500">{sub.progress}/{sub.total} &middot; {sub.pct}%</span>
+            {subjectProgress.length === 0 ? (
+               <div className="text-center py-6 text-slate-500 text-sm">No subjects found in syllabus.</div>
+            ) : (
+              subjectProgress.map((sub: any) => (
+                <div key={sub.name}>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="font-bold text-slate-700">{sub.name}</span>
+                    <span className="text-slate-500">{sub.progress}/{sub.total} &middot; {sub.pct}%</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${sub.color} rounded-full`}
+                      style={{ width: `${sub.pct}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full ${sub.color} rounded-full`} 
-                    style={{ width: `${sub.pct}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -209,32 +282,46 @@ export default function Dashboard() {
             <h3 className="text-[15px] font-bold text-slate-900 mb-4 flex items-center gap-2">
               <RefreshCw className="h-4 w-4 text-blue-500" /> Revisions Due Today
             </h3>
-            <div className="flex-1 flex flex-col items-center justify-center py-8 text-slate-500">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-3">
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
+            {revisionsDue === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-8 text-slate-500">
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-3">
+                  <CheckCircle2 className="h-8 w-8 text-green-600" />
+                </div>
+                <p className="font-semibold text-slate-700 text-sm">All clear!</p>
               </div>
-              <p className="font-semibold text-slate-700 text-sm">All clear!</p>
-            </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center py-6 text-slate-500">
+                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-3">
+                  <RefreshCw className="h-8 w-8 text-orange-600" />
+                </div>
+                <p className="font-semibold text-slate-700 text-sm">You have {revisionsDue} pending revisions!</p>
+              </div>
+            )}
           </div>
 
           {/* Recent Topics */}
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <h3 className="text-[15px] font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Edit3 className="h-4 w-4 text-amber-500" /> Recent Topics
+              <Edit3 className="h-4 w-4 text-amber-500" /> Recent Logged Topics
             </h3>
             <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                  <div className="w-2 h-2 rounded-full bg-green-600 flex-shrink-0"></div>
-                  <div className="flex-1">
-                    <div className="text-xs font-bold text-slate-800">Hindi - Ch-7 Niti Ke Doha</div>
-                    <div className="text-[11px] text-slate-500">Doha- {i === 1 ? 'Rahim' : i === 2 ? 'Kabir' : 'Rahim'}</div>
+              {recentTopics.length === 0 ? (
+                <div className="text-center py-6 text-slate-500 text-sm">No topics logged yet.</div>
+              ) : (
+                recentTopics.map((log: any) => (
+                  <div key={log.id} className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                    <div className="w-2 h-2 rounded-full bg-green-600 flex-shrink-0"></div>
+                    <div className="flex-1">
+                      <div className="text-xs font-bold text-slate-800">{log.subjectName} - {log.chapterName}</div>
+                      <div className="text-[11px] text-slate-500">{log.topicName} {log.subTopicName ? `(${log.subTopicName})` : ''}</div>
+                    </div>
+                    <div className="text-[10px] text-slate-400">{log.date}</div>
                   </div>
-                  <div className="text-[10px] text-slate-400">2026-07-29</div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
+
         </div>
       </div>
     </div>

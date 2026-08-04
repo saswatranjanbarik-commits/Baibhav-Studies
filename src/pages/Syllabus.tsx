@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2 } from 'lucide-react';
+import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2, Download } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
 interface SubTopic {
@@ -296,6 +296,24 @@ export default function Syllabus() {
     setTimeout(() => setImportSuccess(false), 3000);
   };
 
+  const handleDownloadTemplate = () => {
+    const csvContent = [
+      "Date,Week Number,Subject,Plan Type,Chapter - Topic,Status,Learning Index,Doubts",
+      "2026-08-01,1,Mathematics,Self Study,Algebra - Equations,Completed,1.1,",
+      "2026-08-02,1,Science,Quiz,Physics - Motion,Pending,1.2,Need help with velocity"
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "dugu_syllabus_template.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
   return (
     <div className="max-w-7xl mx-auto pb-12">
@@ -315,6 +333,12 @@ export default function Syllabus() {
               onChange={handleFileUpload} 
               className="hidden" 
             />
+            <button
+              onClick={handleDownloadTemplate}
+              className="px-4 py-2 bg-slate-50 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-100 shadow-sm flex items-center gap-2 transition-colors"
+            >
+              <Download className="h-4 w-4" /> CSV Template
+            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50 shadow-sm flex items-center gap-2 transition-colors"
