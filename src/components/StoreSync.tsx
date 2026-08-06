@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
 
 export default function StoreSync({ children }: { children: React.ReactNode }) {
@@ -12,32 +12,49 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
     let originalRemoveItem = window.localStorage.removeItem;
     let originalClear = window.localStorage.clear;
     
-    // We use a generic 'app_data' document or one per user if available
-    const storeDocId = currentUser ? `user_${currentUser.id}` : 'global_store';
+    // Use a single shared global store so all users see the pre-existing data
+    const storeDocId = 'global_store';
     const storeRef = doc(db, 'appStore', storeDocId);
 
-    const fetchStore = async () => {
-      try {
-        const docSnap = await getDoc(storeRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          // Populate local storage with cloud data
-          for (const [key, value] of Object.entries(data)) {
-            originalSetItem.call(window.localStorage, key, JSON.stringify(value));
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    
+    // Listen to real-time changes from the cloud
+    const unsubscribe = onSnapshot(storeRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        let changed = false;
+        
+        // Populate local storage with cloud data
+        for (const [key, value] of Object.entries(data)) {
+          const stringified = JSON.stringify(value);
+          if (window.localStorage.getItem(key) !== stringified) {
+            originalSetItem.call(window.localStorage, key, stringified);
+            changed = true;
           }
         }
-      } catch (error) {
-        console.error('Error fetching store from cloud:', error);
-      } finally {
-        setLoading(false);
+        
+        // Dispatch an event so components know data was updated remotely
+        if (changed) {
+          window.dispatchEvent(new Event('cloud_sync_update'));
+        }
       }
-    };
-    
-    fetchStore();
+      setLoading(false);
+    }, (error) => {
+      console.error('Error in store sync snapshot:', error);
+      setLoading(false);
+    });
 
     // Intercept setItem to also write to the cloud
     window.localStorage.setItem = function(key, value) {
       originalSetItem.call(this, key, value);
+      
+      if (!currentUser) return; // Only sync if logged in
+      
       try {
         let parsedValue = value;
         try {
@@ -52,6 +69,7 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
     };
 
     return () => {
+      unsubscribe();
       window.localStorage.setItem = originalSetItem;
       window.localStorage.removeItem = originalRemoveItem;
       window.localStorage.clear = originalClear;

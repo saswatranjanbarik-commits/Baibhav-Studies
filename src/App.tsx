@@ -6,6 +6,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './lib/AuthContext';
+import StoreSync from './components/StoreSync';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -26,30 +27,32 @@ import Appreciation from './pages/Appreciation';
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/daily-log" element={<DailyLog />} />
-              <Route path="/plan" element={<StudyPlan />} />
-              <Route path="/syllabus" element={<Syllabus />} />
-              <Route path="/notes" element={<StudyNotes />} />
-              <Route path="/revisions" element={<Revisions />} />
-              <Route path="/team-notes" element={<TeamNotes />} />
-              <Route path="/flashcards" element={<Flashcards />} />
-              <Route path="/tasks" element={<Tasks />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/timetable" element={<Timetable />} />
-              <Route path="/users" element={<ManageUsers />} />
-              <Route path="/appreciation" element={<Appreciation />} />
-              <Route path="*" element={<Dashboard />} />
+      <StoreSync>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/daily-log" element={<DailyLog />} />
+                <Route path="/plan" element={<StudyPlan />} />
+                <Route path="/syllabus" element={<Syllabus />} />
+                <Route path="/notes" element={<StudyNotes />} />
+                <Route path="/revisions" element={<Revisions />} />
+                <Route path="/team-notes" element={<TeamNotes />} />
+                <Route path="/flashcards" element={<Flashcards />} />
+                <Route path="/tasks" element={<Tasks />} />
+                <Route path="/calendar" element={<Calendar />} />
+                <Route path="/timetable" element={<Timetable />} />
+                <Route path="/users" element={<ManageUsers />} />
+                <Route path="/appreciation" element={<Appreciation />} />
+                <Route path="*" element={<Dashboard />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </StoreSync>
     </AuthProvider>
   );
 }
