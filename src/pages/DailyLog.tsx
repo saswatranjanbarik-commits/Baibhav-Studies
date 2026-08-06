@@ -261,6 +261,20 @@ export default function DailyLog() {
     }
   };
 
+  const getPeriodTimes = (period: string) => {
+    switch (period) {
+      case 'Period 1': return { timeFrom: '10:30', timeTo: '11:10' };
+      case 'Period 2': return { timeFrom: '11:10', timeTo: '11:50' };
+      case 'Period 3': return { timeFrom: '11:50', timeTo: '12:30' };
+      case 'Period 4': return { timeFrom: '12:30', timeTo: '13:10' };
+      case 'Period 5': return { timeFrom: '13:30', timeTo: '14:10' };
+      case 'Period 6': return { timeFrom: '14:10', timeTo: '14:50' };
+      case 'Period 7': return { timeFrom: '14:50', timeTo: '15:30' };
+      case 'Period 8': return { timeFrom: '15:30', timeTo: '16:10' };
+      default: return { timeFrom: '', timeTo: '' };
+    }
+  };
+
   const calculateDuration = (logsArr: DailyLogEntry[]) => {
     let totalMins = 0;
     logsArr.forEach(l => {
@@ -479,11 +493,14 @@ export default function DailyLog() {
                     ) : (
                       <button
                         onClick={() => {
+                          const { timeFrom, timeTo } = getPeriodTimes(t.period);
                           setNewLog({
                             logType: 'School',
                             category: 'Rock',
                             date: activeDate,
                             period: t.period,
+                            timeFrom,
+                            timeTo,
                             subjectId: t.subjectId,
                             status: 'In Progress'
                           });
