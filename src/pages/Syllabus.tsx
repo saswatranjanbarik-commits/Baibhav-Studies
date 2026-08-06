@@ -60,6 +60,35 @@ export default function Syllabus() {
   const [importSuccess, setImportSuccess] = useState(false);
   const [dailyLogs, setDailyLogs] = useState<any[]>([]);
 
+  const getTopicStatus = (topicId: string) => {
+    const logs = dailyLogs.filter(l => l.topicId === topicId);
+    if (logs.length === 0) return 'Pending';
+    if (logs.some(l => l.status === 'Completed')) return 'Completed';
+    return 'In Progress';
+  };
+
+  const getChapterStatus = (chapter: Chapter) => {
+    if (!chapter.topics.length) return 'Pending';
+    const topicStatuses = chapter.topics.map(t => getTopicStatus(t.id));
+    if (topicStatuses.every(s => s === 'Completed')) return 'Completed';
+    if (topicStatuses.some(s => s === 'Completed' || s === 'In Progress')) return 'In Progress';
+    return 'Pending';
+  };
+
+  const getSubjectStatus = (subject: Subject) => {
+    if (!subject.chapters.length) return 'Pending';
+    const chapterStatuses = subject.chapters.map(c => getChapterStatus(c));
+    if (chapterStatuses.every(s => s === 'Completed')) return 'Completed';
+    if (chapterStatuses.some(s => s === 'Completed' || s === 'In Progress')) return 'In Progress';
+    return 'Pending';
+  };
+
+  const StatusBadge = ({ status }: { status: string }) => {
+    if (status === 'Completed') return <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Completed</span>;
+    if (status === 'In Progress') return <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">In Progress</span>;
+    return <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">Pending</span>;
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem('dugu_syllabus_v2');
     if (saved) {
@@ -393,9 +422,14 @@ export default function Syllabus() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm min-h-[500px]">
         {/* Active Subject Header */}
         <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 rounded-t-xl">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">{activeSubject?.name || "Select a subject"}</h3>
-            <p className="text-sm text-slate-500">{activeSubject?.chapters.length || 0} Chapters in this subject</p>
+          <div className="flex items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold text-slate-900">{activeSubject?.name || "Select a subject"}</h3>
+                {activeSubject && <StatusBadge status={getSubjectStatus(activeSubject)} />}
+              </div>
+              <p className="text-sm text-slate-500 mt-1">{activeSubject?.chapters.length || 0} Chapters in this subject</p>
+            </div>
           </div>
           {!isStudent && activeSubject && (
             <button 
@@ -425,6 +459,7 @@ export default function Syllabus() {
                       <span className="font-bold text-slate-800">{chapter.name}</span>
                       <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full ml-2">Chapter</span>
                       {chapter.term && <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full ml-2 font-bold">{chapter.term}</span>}
+                      <StatusBadge status={getChapterStatus(chapter)} />
                     </div>
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       {!isStudent && (
@@ -459,6 +494,7 @@ export default function Syllabus() {
                               {expandedNodes[topic.id] ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
                               <span className="font-semibold text-slate-700 text-sm">{topic.name}</span>
                               <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full ml-2">Topic</span>
+                              <StatusBadge status={getTopicStatus(topic.id)} />
                             </div>
                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               {!isStudent && (

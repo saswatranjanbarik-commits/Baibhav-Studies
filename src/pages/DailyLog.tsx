@@ -76,9 +76,22 @@ export default function DailyLog() {
     if (savedRevisions) setRevisions(JSON.parse(savedRevisions));
   }, []);
 
-  const saveLogs = (newLogs: DailyLogEntry[]) => {
-    setLogs(newLogs);
-    localStorage.setItem('dugu_daily_logs', JSON.stringify(newLogs));
+  const saveLogs = async (updater: (prev: DailyLogEntry[]) => DailyLogEntry[]) => {
+    try {
+      const res = await fetch('/api/store/dugu_daily_logs');
+      let currentLogs = logs;
+      if (res.ok) {
+        currentLogs = await res.json();
+      }
+      const newLogs = updater(currentLogs);
+      setLogs(newLogs);
+      localStorage.setItem('dugu_daily_logs', JSON.stringify(newLogs));
+    } catch (e) {
+      console.error('Failed to sync before saving logs, falling back to local state:', e);
+      const newLogs = updater(logs);
+      setLogs(newLogs);
+      localStorage.setItem('dugu_daily_logs', JSON.stringify(newLogs));
+    }
   };
 
   const scheduleRevisions = (log: DailyLogEntry) => {
@@ -176,7 +189,7 @@ export default function DailyLog() {
       log.activityDetail = newLog.activityDetail;
     }
 
-    saveLogs([log, ...logs]);
+    saveLogs(prevLogs => [log, ...prevLogs]);
     
     if (log.category === 'Rock') {
       scheduleRevisions(log);
@@ -193,19 +206,18 @@ export default function DailyLog() {
 
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this log?')) {
-      saveLogs(logs.filter(l => l.id !== id));
+      saveLogs(prevLogs => prevLogs.filter(l => l.id !== id));
     }
   };
 
   const toggleStatus = (id: string) => {
-    const updated = logs.map(l => {
+    saveLogs(prevLogs => prevLogs.map(l => {
       if (l.id === id && l.category === 'Rock') {
         const nextStatus = l.status === 'Completed' ? 'In Progress' : 'Completed';
         return { ...l, status: nextStatus };
       }
       return l;
-    });
-    saveLogs(updated);
+    }));
   };
 
   const filteredLogs = logs.filter(l => l.date === activeDate);
