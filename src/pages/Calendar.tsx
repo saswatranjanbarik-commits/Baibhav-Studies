@@ -59,20 +59,18 @@ export default function Calendar() {
     const savedLogs = localStorage.getItem('dugu_daily_logs');
     if (savedLogs) setDailyLogs(JSON.parse(savedLogs));
 
-    // Sync from server
+    // Sync from local storage
     const fetchSyncData = async () => {
       try {
-        const resLogs = await fetch('/api/store/dugu_daily_logs');
-        if (resLogs.ok) {
-          const logs = await resLogs.json();
+        const savedLogs = localStorage.getItem('dugu_daily_logs');
+        if (savedLogs) {
+          const logs = JSON.parse(savedLogs);
           setDailyLogs(logs);
-          localStorage.setItem('dugu_daily_logs', JSON.stringify(logs));
         }
-        const resEvents = await fetch('/api/store/dugu_events');
-        if (resEvents.ok) {
-          const eventsData = await resEvents.json();
+        const savedEvents = localStorage.getItem('dugu_events');
+        if (savedEvents) {
+          const eventsData = JSON.parse(savedEvents);
           setEvents(eventsData);
-          localStorage.setItem('dugu_events', JSON.stringify(eventsData));
         }
       } catch (e) {
         console.error('Failed to sync data for calendar:', e);
@@ -83,13 +81,6 @@ export default function Calendar() {
 
   const saveEvents = async (newEvents: Event[]) => {
     try {
-      const res = await fetch('/api/store/dugu_events');
-      let currentEvents = events;
-      if (res.ok) {
-        currentEvents = await res.json();
-      }
-      // Since it's a direct overwrite on this app usually, we just save what we have or merge.
-      // But to keep it simple and safe for adding, we'll just overwrite.
       setEvents(newEvents);
       localStorage.setItem('dugu_events', JSON.stringify(newEvents));
     } catch (e) {

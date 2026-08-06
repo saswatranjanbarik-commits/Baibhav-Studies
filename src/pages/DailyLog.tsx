@@ -86,10 +86,10 @@ export default function DailyLog() {
 
   const saveLogs = async (updater: (prev: DailyLogEntry[]) => DailyLogEntry[]) => {
     try {
-      const res = await fetch('/api/store/dugu_daily_logs');
       let currentLogs = logs;
-      if (res.ok) {
-        currentLogs = await res.json();
+      const savedLogs = localStorage.getItem('dugu_daily_logs');
+      if (savedLogs) {
+        currentLogs = JSON.parse(savedLogs);
       }
       const newLogs = updater(currentLogs);
       setLogs(newLogs);

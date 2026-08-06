@@ -52,14 +52,10 @@ export default function Dashboard() {
 
     const fetchSyncData = async () => {
       try {
-        const resLogs = await fetch('/api/store/dugu_daily_logs');
         let logs: any[] = [];
-        if (resLogs.ok) {
-          logs = await resLogs.json();
-          localStorage.setItem('dugu_daily_logs', JSON.stringify(logs));
-        } else {
-          const savedLogs = localStorage.getItem('dugu_daily_logs');
-          if (savedLogs) logs = JSON.parse(savedLogs);
+        const savedLogs = localStorage.getItem('dugu_daily_logs');
+        if (savedLogs) {
+          logs = JSON.parse(savedLogs);
         }
 
         setTopicsLogged(logs.length);
