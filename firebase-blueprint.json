@@ -1,0 +1,16 @@
+{
+  "entities": {
+    "appStoreData": {
+      "title": "App Store Data",
+      "description": "App store data synchronization",
+      "type": "object",
+      "properties": {}
+    }
+  },
+  "firestore": {
+    "/appStore/{storeId}": {
+      "schema": "#/entities/appStoreData",
+      "description": "User specific app store data"
+    }
+  }
+}

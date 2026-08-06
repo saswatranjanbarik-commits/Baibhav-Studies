@@ -1,4 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, googleSignIn, logoutGoogle } from "./firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "./firebase";
 
 export interface AppUser {
   id: string;
@@ -10,7 +14,7 @@ export interface AppUser {
 interface AuthContextType {
   currentUser: AppUser | null;
   loading: boolean;
-  login: (username: string, password?: string) => Promise<void>;
+  login: (username?: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -28,54 +32,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('active_user');
-    if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        let appUser: AppUser = {
+          id: user.uid,
+          username: user.displayName || user.email || 'User',
+          role: user.email === 'saswatranjanbarik@gmail.com' ? 'Admin' : 'Student',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          let userDoc = await getDoc(userRef);
+          
+          if (!userDoc.exists()) {
+            await setDoc(userRef, appUser);
+          } else {
+            appUser = userDoc.data() as AppUser;
+            if (user.email === 'saswatranjanbarik@gmail.com' && appUser.role !== 'Admin') {
+              appUser.role = 'Admin';
+              await setDoc(userRef, appUser, { merge: true });
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching/updating user in Firestore:", error);
+        }
+        
+        setCurrentUser(appUser);
+      } else {
+        setCurrentUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const login = async (username: string, password?: string) => {
-    const usersStr = localStorage.getItem('dugu_users_v2');
-    let users = usersStr ? JSON.parse(usersStr) : [
-      {
-        id: '1',
-        username: 'Saswat',
-        password: 'admin123',
-        role: 'Admin',
-        timezone: 'UTC+05:30 (Indian Standard Time)'
-      }
-    ];
-
-    if (!usersStr) {
-      localStorage.setItem('dugu_users_v2', JSON.stringify(users));
-    } else {
-      // Fix for previously saved users without password
-      const adminIndex = users.findIndex((u: any) => u.username === 'Saswat');
-      if (adminIndex !== -1 && !users[adminIndex].password) {
-        users[adminIndex].password = 'admin123';
-        localStorage.setItem('dugu_users_v2', JSON.stringify(users));
-      }
-    }
-    
-    // Simple check against stored users
-    const user = users.find((u: any) => 
-      u.username.toLowerCase().trim() === username.toLowerCase().trim() && 
-      u.password === password
-    );
-    
-    if (user) {
-      const appUser = { id: user.id, username: user.username, role: user.role, timezone: user.timezone };
-      setCurrentUser(appUser);
-      localStorage.setItem('active_user', JSON.stringify(appUser));
-    } else {
-      throw new Error("Invalid username or password");
+  const login = async () => {
+    try {
+      await googleSignIn();
+    } catch (error) {
+      console.error("Login failed:", error);
+      throw error;
     }
   };
 
   const logout = async () => {
-    setCurrentUser(null);
-    localStorage.removeItem('active_user');
+    try {
+      await logoutGoogle();
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   return (
