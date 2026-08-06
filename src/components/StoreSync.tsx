@@ -24,25 +24,50 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
     setLoading(true);
     
     // Listen to real-time changes from the cloud
-    const unsubscribe = onSnapshot(storeRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        let changed = false;
-        
-        // Populate local storage with cloud data
-        for (const [key, value] of Object.entries(data)) {
-          const stringified = JSON.stringify(value);
-          if (window.localStorage.getItem(key) !== stringified) {
-            originalSetItem.call(window.localStorage, key, stringified);
-            changed = true;
+    const unsubscribe = onSnapshot(storeRef, async (docSnap) => {
+      let data = docSnap.exists() ? docSnap.data() : {};
+      
+      // MIGRATION: Push existing local data to cloud if it's not in the cloud yet
+      let needsCloudUpload = false;
+      const localUploads: Record<string, any> = {};
+      
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith('dugu_')) {
+          // If the cloud doesn't have this key, we should upload our local version
+          if (data[key] === undefined) {
+            const localValue = window.localStorage.getItem(key);
+            if (localValue) {
+              try {
+                localUploads[key] = JSON.parse(localValue);
+                needsCloudUpload = true;
+                data[key] = localUploads[key]; // immediately use it locally
+              } catch (e) {}
+            }
           }
         }
-        
-        // Dispatch an event so components know data was updated remotely
-        if (changed) {
-          window.dispatchEvent(new Event('cloud_sync_update'));
+      }
+
+      if (needsCloudUpload) {
+        console.log("Uploading existing local data to cloud...", localUploads);
+        setDoc(storeRef, localUploads, { merge: true }).catch(console.error);
+      }
+
+      // Populate local storage with cloud data
+      let changed = false;
+      for (const [key, value] of Object.entries(data)) {
+        const stringified = JSON.stringify(value);
+        if (window.localStorage.getItem(key) !== stringified) {
+          originalSetItem.call(window.localStorage, key, stringified);
+          changed = true;
         }
       }
+      
+      // Dispatch an event so components know data was updated remotely
+      if (changed) {
+        window.dispatchEvent(new Event('cloud_sync_update'));
+      }
+      
       setLoading(false);
     }, (error) => {
       console.error('Error in store sync snapshot:', error);

@@ -292,9 +292,9 @@ export default function Flashcards() {
   };
 
   const filteredItems = items.filter(i => 
-    i.subjectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    i.chapterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    i.topicName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (i.subjectName && i.subjectName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (i.chapterName && i.chapterName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (i.topicName && i.topicName.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (i.front && i.front.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (i.question && i.question.toLowerCase().includes(searchQuery.toLowerCase()))
   );

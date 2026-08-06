@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, X, Search, Edit2, Trash2, Globe, Shield, User, Mail, AlertTriangle } from 'lucide-react';
 import { collection, doc, getDocs, setDoc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, secondaryAuth, createUserWithEmailAndPassword } from '../lib/firebase';
 import { AppUser } from '../lib/AuthContext';
 
 const TIMEZONES = [
@@ -42,9 +42,10 @@ export default function ManageUsers() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   
-  const [newUser, setNewUser] = useState<Partial<AppUser>>({
+  const [newUser, setNewUser] = useState<Partial<AppUser> & { password?: string }>({
     role: 'Student',
-    timezone: 'UTC (Coordinated Universal Time)'
+    timezone: 'UTC (Coordinated Universal Time)',
+    password: ''
   });
   
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
@@ -75,6 +76,22 @@ export default function ManageUsers() {
 
     try {
       const email = newUser.email.toLowerCase();
+      
+      // If creating a new user, create their authentication account first
+      if (!editingUser) {
+        if (!newUser.password) {
+          alert("Password is required for new users.");
+          return;
+        }
+        try {
+          await createUserWithEmailAndPassword(secondaryAuth, email, newUser.password);
+        } catch (authError: any) {
+          console.error("Auth creation error:", authError);
+          alert(authError.message || "Failed to create user authentication. Email might already be in use.");
+          return;
+        }
+      }
+
       const userRef = doc(db, 'users', email);
       
       const userData = {
@@ -82,14 +99,14 @@ export default function ManageUsers() {
         username: newUser.username,
         role: newUser.role,
         timezone: newUser.timezone,
-        id: editingUser?.id || `pre-registered-${Date.now()}` // Only used if they haven't signed in yet
+        id: editingUser?.id || `user-${Date.now()}`
       };
 
       await setDoc(userRef, userData, { merge: true });
       
       setShowAddModal(false);
       setEditingUser(null);
-      setNewUser({ role: 'Student', timezone: 'UTC (Coordinated Universal Time)' });
+      setNewUser({ role: 'Student', timezone: 'UTC (Coordinated Universal Time)', password: '' });
     } catch (error) {
       console.error("Error saving user:", error);
       alert("Failed to save user. Check permissions.");
@@ -113,9 +130,9 @@ export default function ManageUsers() {
   };
 
   const filteredUsers = users.filter(u => 
-    u.username.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (u.username && u.username.toLowerCase().includes(searchQuery.toLowerCase())) || 
     (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    u.role.toLowerCase().includes(searchQuery.toLowerCase())
+    (u.role && u.role.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const getRoleBadge = (role: string) => {
@@ -270,7 +287,7 @@ export default function ManageUsers() {
               {!editingUser && (
                 <div className="mb-4 bg-blue-50 text-blue-800 p-3 rounded-lg text-xs flex items-start gap-2 border border-blue-200">
                   <Shield className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <p>Registering a user allows you to pre-assign their role. When they sign in using this Google email, they will automatically receive the permissions below.</p>
+                  <p>Registering a user will create their login credentials. They can use the email and password to access their dashboard.</p>
                 </div>
               )}
 
@@ -289,6 +306,24 @@ export default function ManageUsers() {
                   />
                 </div>
               </div>
+
+              {!editingUser && (
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Password *</label>
+                  <div className="relative">
+                    <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="password"
+                      required={!editingUser}
+                      value={newUser.password || ''}
+                      onChange={e => setNewUser({...newUser, password: e.target.value})}
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
+                      placeholder="Enter a secure password"
+                      minLength={6}
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1.5">Display Name *</label>

@@ -254,7 +254,7 @@ export default function Syllabus() {
     let newPlanEntries: any[] = [];
     
     const getOrCreateSubject = (name: string) => {
-      let sub = currentSyllabus.find(s => s.name.toLowerCase() === name.toLowerCase());
+      let sub = currentSyllabus.find(s => s.name && name && s.name.toLowerCase() === name.toLowerCase());
       if (!sub) {
         sub = { id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name, chapters: [] };
         currentSyllabus.push(sub);
@@ -263,7 +263,7 @@ export default function Syllabus() {
     };
 
     const getOrCreateChapter = (sub: any, name: string) => {
-      let ch = sub.chapters.find((c: any) => c.name.toLowerCase() === name.toLowerCase());
+      let ch = sub.chapters.find((c: any) => c.name && name && c.name.toLowerCase() === name.toLowerCase());
       if (!ch) {
         ch = { id: `ch_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name, topics: [] };
         sub.chapters.push(ch);
@@ -272,7 +272,7 @@ export default function Syllabus() {
     };
 
     const getOrCreateTopic = (ch: any, name: string) => {
-      let tp = ch.topics.find((t: any) => t.name.toLowerCase() === name.toLowerCase());
+      let tp = ch.topics.find((t: any) => t.name && name && t.name.toLowerCase() === name.toLowerCase());
       if (!tp) {
         tp = { id: `tp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name, subTopics: [] };
         ch.topics.push(tp);

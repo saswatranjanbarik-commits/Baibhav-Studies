@@ -1,68 +1,48 @@
-import { initializeApp } from "firebase/app";
-import { initializeAuth, GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged, browserSessionPersistence, inMemoryPersistence, browserPopupRedirectResolver } from "firebase/auth";
+import { initializeApp, getApp, getApps } from "firebase/app";
+import { initializeAuth, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged, browserSessionPersistence, inMemoryPersistence, browserPopupRedirectResolver } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import firebaseConfig from "../../firebase-applet-config.json";
 
-const app = initializeApp(firebaseConfig);
+// Custom Firebase project configuration
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD4hjE7UhFfzpBh63XzPwRY9gOhCQfUn8w",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "dugu-edutrack.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "dugu-edutrack",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "dugu-edutrack.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "336963361004",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:336963361004:web:4cde59e43fee0ad3282dc9"
+};
+
+// Primary App for normal usage
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = initializeAuth(app, {
   persistence: [browserSessionPersistence, inMemoryPersistence],
   popupRedirectResolver: browserPopupRedirectResolver
 });
 
-export const db = (firebaseConfig as any).firestoreDatabaseId 
-  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
-  : getFirestore(app);
+// Secondary App exclusively for Admin to create users without being signed out
+const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+export const secondaryAuth = getAuth(secondaryApp);
+
+export const db = getFirestore(app);
 
 export const googleProvider = new GoogleAuthProvider();
 
-let isSigningIn = false;
-let cachedAccessToken: string | null = null;
+export { signInWithEmailAndPassword, createUserWithEmailAndPassword };
 
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: User) => void,
   onAuthFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
-        cachedAccessToken = null;
-        if (onAuthFailure) onAuthFailure();
-      }
+      if (onAuthSuccess) onAuthSuccess(user);
     } else {
-      cachedAccessToken = null;
       if (onAuthFailure) onAuthFailure();
     }
   });
 };
 
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
-  try {
-    isSigningIn = true;
-    const result = await signInWithPopup(auth, googleProvider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    
-    if (!credential?.accessToken) {
-      throw new Error('Failed to get access token from Firebase Auth');
-    }
-
-    cachedAccessToken = credential.accessToken;
-    return { user: result.user, accessToken: cachedAccessToken };
-  } catch (error: any) {
-    console.error('Sign in error:', error);
-    throw error;
-  } finally {
-    isSigningIn = false;
-  }
-};
-
-export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
-};
-
-export const logoutGoogle = async () => {
+export const logoutAuth = async () => {
   await auth.signOut();
-  cachedAccessToken = null;
 };

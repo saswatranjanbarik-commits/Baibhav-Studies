@@ -150,8 +150,8 @@ export default function Tasks() {
   };
 
   const filteredTasks = tasks.filter(t => {
-    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         t.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (t.title && t.title.toLowerCase().includes(searchQuery.toLowerCase())) || 
+                         (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus = filterStatus === 'All' || t.status === filterStatus;
     const matchesPriority = filterPriority === 'All' || t.priority === filterPriority;
     return matchesSearch && matchesStatus && matchesPriority;

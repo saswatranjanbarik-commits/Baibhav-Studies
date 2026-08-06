@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, googleSignIn, logoutGoogle } from "./firebase";
+import { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, logoutAuth } from "./firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -15,7 +15,8 @@ export interface AppUser {
 interface AuthContextType {
   currentUser: AppUser | null;
   loading: boolean;
-  login: (username?: string, password?: string) => Promise<void>;
+  login: (email?: string, password?: string) => Promise<void>;
+  signUp: (email?: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   currentUser: null,
   loading: true,
   login: async () => {},
+  signUp: async () => {},
   logout: async () => {},
 });
 
@@ -48,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: user.email === 'saswatranjanbarik@gmail.com' ? 'Admin' : 'Student',
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
+
         try {
           const userRef = doc(db, 'users', user.email.toLowerCase());
           let userDoc = await getDoc(userRef);
@@ -57,6 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             const data = userDoc.data();
             appUser = { ...appUser, ...data } as AppUser;
+            
             if (user.email === 'saswatranjanbarik@gmail.com' && appUser.role !== 'Admin') {
               appUser.role = 'Admin';
               await setDoc(userRef, appUser, { merge: true });
@@ -76,28 +80,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const login = async () => {
+  const login = async (email?: string, password?: string) => {
     try {
-      await googleSignIn();
+      if (!email || !password) throw new Error("Email and password required");
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
       console.error("Login failed:", error);
       throw error;
     }
   };
 
+  const signUp = async (email?: string, password?: string) => {
+    try {
+      if (!email || !password) throw new Error("Email and password required");
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+      console.error("Signup failed:", error);
+      throw error;
+    }
+  };
+
   const logout = async () => {
     try {
-      await logoutGoogle();
+      await logoutAuth();
     } catch (error) {
       console.error("Logout failed:", error);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, loading, login, logout }}>
+    <AuthContext.Provider value={{ currentUser, loading, login, signUp, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );
 };
-
-

@@ -83,8 +83,8 @@ export default function TeamNotes() {
   };
 
   const filteredNotes = notes.filter(n => {
-    const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         n.content.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (n.title && n.title.toLowerCase().includes(searchQuery.toLowerCase())) || 
+                         (n.content && n.content.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = filterCategory === 'All' || n.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
