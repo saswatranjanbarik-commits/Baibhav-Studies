@@ -17,94 +17,105 @@ export default function Dashboard() {
   const [subjectProgress, setSubjectProgress] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    // 1. Load points
-    const savedAppreciation = localStorage.getItem('dugu_appreciation');
-    if (savedAppreciation) {
-      const records = JSON.parse(savedAppreciation);
-      setTotalPoints(records.reduce((sum: number, r: any) => sum + (Number(r.points) || 0), 0));
-    }
+    // Basic local load first
+    const loadFromLocal = () => {
+      // 1. Load points
+      const savedAppreciation = localStorage.getItem('dugu_appreciation');
+      if (savedAppreciation) {
+        const records = JSON.parse(savedAppreciation);
+        setTotalPoints(records.reduce((sum: number, r: any) => sum + (Number(r.points) || 0), 0));
+      }
+      
+      // 2. Load Event
+      const savedEvent = localStorage.getItem('dugu_upcoming_event');
+      if (savedEvent) setUpcomingEvent(JSON.parse(savedEvent));
+
+      // 4. Load Revisions
+      const savedRevisions = localStorage.getItem('dugu_revisions');
+      if (savedRevisions) {
+        const revs = JSON.parse(savedRevisions);
+        const today = new Date().toISOString().split('T')[0];
+        const due = revs.filter((r: any) => r.status === 'Pending' && r.nextRevisionDate <= today);
+        setRevisionsDue(due.length);
+      }
+
+      // 5. Load Tasks
+      const savedTasks = localStorage.getItem('dugu_tasks');
+      if (savedTasks) {
+        const tasks = JSON.parse(savedTasks);
+        const pending = tasks.filter((t: any) => t.status === 'Pending');
+        setPendingTasks(pending.length);
+      }
+    };
     
-    // 2. Load Event
-    const savedEvent = localStorage.getItem('dugu_upcoming_event');
-    if (savedEvent) setUpcomingEvent(JSON.parse(savedEvent));
+    loadFromLocal();
 
-    // 3. Load daily logs for "Topics Logged" and "Recent Topics"
-    const savedLogs = localStorage.getItem('dugu_daily_logs');
-    let logs = [];
-    if (savedLogs) {
-      logs = JSON.parse(savedLogs);
-      setTopicsLogged(logs.length);
-      setRecentTopics(logs.slice(0, 3)); // top 3 recent
-    }
+    const fetchSyncData = async () => {
+      try {
+        const resLogs = await fetch('/api/store/dugu_daily_logs');
+        let logs: any[] = [];
+        if (resLogs.ok) {
+          logs = await resLogs.json();
+          localStorage.setItem('dugu_daily_logs', JSON.stringify(logs));
+        } else {
+          const savedLogs = localStorage.getItem('dugu_daily_logs');
+          if (savedLogs) logs = JSON.parse(savedLogs);
+        }
 
-    // 4. Load Revisions
-    const savedRevisions = localStorage.getItem('dugu_revisions');
-    if (savedRevisions) {
-      const revs = JSON.parse(savedRevisions);
-      // count pending revisions due today or earlier
-      const today = new Date().toISOString().split('T')[0];
-      const due = revs.filter((r: any) => r.status === 'Pending' && r.nextRevisionDate <= today);
-      setRevisionsDue(due.length);
-    }
+        setTopicsLogged(logs.length);
+        setRecentTopics(logs.slice(0, 3));
 
-    // 5. Load Tasks
-    const savedTasks = localStorage.getItem('dugu_tasks');
-    if (savedTasks) {
-      const tasks = JSON.parse(savedTasks);
-      const pending = tasks.filter((t: any) => t.status === 'Pending');
-      setPendingTasks(pending.length);
-    }
+        const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
+        const savedPlan = localStorage.getItem('dugu_study_plan');
+        
+        if (savedSyllabus) {
+          const syllabus = JSON.parse(savedSyllabus);
+          let plan: any[] = [];
+          if (savedPlan) plan = JSON.parse(savedPlan);
+          
+          const colors = ['bg-indigo-600', 'bg-purple-600', 'bg-blue-500', 'bg-green-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500'];
+          
+          let totalItems = 0;
+          let completedItems = 0;
+          
+          const subProgs = syllabus.map((sub: any, idx: number) => {
+            let subTotalTopics = 0;
+            sub.chapters?.forEach((ch: any) => {
+              subTotalTopics += ch.topics?.length || 0;
+            });
+            
+            const completedInPlan = plan.filter((p: any) => p.subjectId === sub.id && p.status === 'Completed').map((p: any) => p.topicId);
+            const completedInLogs = logs.filter((l: any) => l.subjectId === sub.id && l.status === 'Completed').map((l: any) => l.topicId);
+            const completedTopics = new Set([...completedInPlan, ...completedInLogs]);
+            const completedCount = Array.from(completedTopics).filter(id => id).length;
+            const additionalCompleted = [...completedInPlan, ...completedInLogs].filter(id => !id).length;
+            const completedInSub = completedCount + additionalCompleted;
+            
+            const displayTotal = Math.max(subTotalTopics, plan.filter((p: any) => p.subjectId === sub.id).length);
+            
+            totalItems += displayTotal;
+            completedItems += completedInSub;
+            
+            const pct = displayTotal > 0 ? Math.round((completedInSub / displayTotal) * 100) : 0;
+            
+            return {
+              name: sub.name,
+              progress: completedInSub,
+              total: displayTotal,
+              pct: pct,
+              color: colors[idx % colors.length]
+            };
+          });
+          
+          setSubjectProgress(subProgs);
+          setOverallProgress(totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0);
+        }
+      } catch (e) {
+        console.error('Failed to sync data for dashboard:', e);
+      }
+    };
 
-    // 6. Calculate Progress based on Study Plan
-    const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
-    const savedPlan = localStorage.getItem('dugu_study_plan');
-    
-    if (savedSyllabus) {
-      const syllabus = JSON.parse(savedSyllabus);
-      let plan = [];
-      if (savedPlan) plan = JSON.parse(savedPlan);
-      
-      const colors = ['bg-indigo-600', 'bg-purple-600', 'bg-blue-500', 'bg-green-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500'];
-      
-      let totalItems = 0;
-      let completedItems = 0;
-      
-      const subProgs = syllabus.map((sub: any, idx: number) => {
-        // Count topics in this subject
-        let subTotalTopics = 0;
-        sub.chapters?.forEach((ch: any) => {
-          subTotalTopics += ch.topics?.length || 0;
-        });
-        
-        // Count completed in study plan and daily logs for this subject
-        const completedInPlan = plan.filter((p: any) => p.subjectId === sub.id && p.status === 'Completed').map((p: any) => p.topicId);
-        const completedInLogs = logs.filter((l: any) => l.subjectId === sub.id && l.status === 'Completed').map((l: any) => l.topicId);
-        const completedTopics = new Set([...completedInPlan, ...completedInLogs]);
-        // some might not have topicId (e.g. general subject study), filter out undefined
-        const completedCount = Array.from(completedTopics).filter(id => id).length;
-        const additionalCompleted = [...completedInPlan, ...completedInLogs].filter(id => !id).length;
-        const completedInSub = completedCount + additionalCompleted;
-        
-        // If syllabus doesn't have topics defined yet, we'll just use the study plan totals as a rough metric or 0
-        const displayTotal = Math.max(subTotalTopics, plan.filter((p: any) => p.subjectId === sub.id).length);
-        
-        totalItems += displayTotal;
-        completedItems += completedInSub;
-        
-        const pct = displayTotal > 0 ? Math.round((completedInSub / displayTotal) * 100) : 0;
-        
-        return {
-          name: sub.name,
-          progress: completedInSub,
-          total: displayTotal,
-          pct: pct,
-          color: colors[idx % colors.length]
-        };
-      });
-      
-      setSubjectProgress(subProgs);
-      setOverallProgress(totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0);
-    }
+    fetchSyncData();
   }, []);
 
   const saveEvent = (e: React.FormEvent) => {

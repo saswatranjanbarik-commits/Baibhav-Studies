@@ -12,6 +12,7 @@ interface DailyLogEntry {
   category?: Category;
   timeFrom?: string;
   timeTo?: string;
+  teacherName?: string;
   
   // Backwards compat / Rock
   period?: string;
@@ -53,6 +54,7 @@ export default function DailyLog() {
   const [timetable, setTimetable] = useState<any[]>([]);
   const [revisions, setRevisions] = useState<RevisionEntry[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [teachers, setTeachers] = useState<any[]>([]);
   
   const [newLog, setNewLog] = useState<Partial<DailyLogEntry>>({
     logType: 'Self Study',
@@ -74,6 +76,12 @@ export default function DailyLog() {
     if (savedTimetable) setTimetable(JSON.parse(savedTimetable));
     const savedRevisions = localStorage.getItem('dugu_revisions');
     if (savedRevisions) setRevisions(JSON.parse(savedRevisions));
+    
+    const savedUsers = localStorage.getItem('dugu_users_v2');
+    if (savedUsers) {
+      const users = JSON.parse(savedUsers);
+      setTeachers(users.filter((u: any) => u.role === 'Teacher'));
+    }
   }, []);
 
   const saveLogs = async (updater: (prev: DailyLogEntry[]) => DailyLogEntry[]) => {
@@ -166,6 +174,14 @@ export default function DailyLog() {
       period: newLog.period,
       notes: newLog.notes || ''
     };
+
+    if (log.logType === 'Tutor' || log.logType === 'School') {
+      if (currentUser?.role === 'Teacher') {
+        log.teacherName = currentUser.username;
+      } else if (newLog.teacherName) {
+        log.teacherName = newLog.teacherName;
+      }
+    }
 
     if (log.category === 'Rock') {
       if (!newLog.subjectId || !newLog.chapterId) {
@@ -286,15 +302,15 @@ export default function DailyLog() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
           <div className="text-sm text-slate-500 font-semibold mb-1">Rocks (Study)</div>
-          <div className="text-2xl font-bold text-indigo-700">{calculateDuration(logs.filter(l => l.category === 'Rock' || !l.category))}</div>
+          <div className="text-2xl font-bold text-indigo-700">{calculateDuration(filteredLogs.filter(l => l.category === 'Rock' || !l.category))}</div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
           <div className="text-sm text-slate-500 font-semibold mb-1">Pebbles (Activities)</div>
-          <div className="text-2xl font-bold text-green-700">{calculateDuration(logs.filter(l => l.category === 'Pebble'))}</div>
+          <div className="text-2xl font-bold text-green-700">{calculateDuration(filteredLogs.filter(l => l.category === 'Pebble'))}</div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
           <div className="text-sm text-slate-500 font-semibold mb-1">Sand (Play)</div>
-          <div className="text-2xl font-bold text-orange-700">{calculateDuration(logs.filter(l => l.category === 'Sand'))}</div>
+          <div className="text-2xl font-bold text-orange-700">{calculateDuration(filteredLogs.filter(l => l.category === 'Sand'))}</div>
         </div>
       </div>
 
@@ -366,6 +382,11 @@ export default function DailyLog() {
                             {getTypeIcon(log.logType)}
                             <span className="font-bold text-slate-700 text-sm">{log.logType || 'Study'}</span>
                           </div>
+                          {log.teacherName && (
+                            <div className="text-[11px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded w-max">
+                              {log.teacherName}
+                            </div>
+                          )}
                           <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border w-max ${getCategoryColor(log.category || 'Rock')}`}>
                             {log.category || 'Rock'}
                           </span>
@@ -556,6 +577,23 @@ export default function DailyLog() {
                   />
                 </div>
               </div>
+
+              {/* Teacher Selection for Tutor Activity */}
+              {newLog.logType === 'Tutor' && isStudent && (
+                <div className="mb-6 pb-6 border-b border-slate-100">
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Teacher / Tutor</label>
+                  <select
+                    value={newLog.teacherName || ''}
+                    onChange={e => setNewLog({...newLog, teacherName: e.target.value})}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                  >
+                    <option value="">-- Select Teacher --</option>
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.username}>{t.username}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Conditional Fields */}
               {(newLog.category === 'Rock') && (
