@@ -29,7 +29,7 @@ export default function Dashboard() {
     if (savedEvent) setUpcomingEvent(JSON.parse(savedEvent));
 
     // 3. Load daily logs for "Topics Logged" and "Recent Topics"
-    const savedLogs = localStorage.getItem('dugu_daily_log');
+    const savedLogs = localStorage.getItem('dugu_daily_logs');
     let logs = [];
     if (savedLogs) {
       logs = JSON.parse(savedLogs);
@@ -76,8 +76,14 @@ export default function Dashboard() {
           subTotalTopics += ch.topics?.length || 0;
         });
         
-        // Count completed in study plan for this subject
-        const completedInSub = plan.filter((p: any) => p.subjectId === sub.id && p.status === 'Completed').length;
+        // Count completed in study plan and daily logs for this subject
+        const completedInPlan = plan.filter((p: any) => p.subjectId === sub.id && p.status === 'Completed').map((p: any) => p.topicId);
+        const completedInLogs = logs.filter((l: any) => l.subjectId === sub.id && l.status === 'Completed').map((l: any) => l.topicId);
+        const completedTopics = new Set([...completedInPlan, ...completedInLogs]);
+        // some might not have topicId (e.g. general subject study), filter out undefined
+        const completedCount = Array.from(completedTopics).filter(id => id).length;
+        const additionalCompleted = [...completedInPlan, ...completedInLogs].filter(id => !id).length;
+        const completedInSub = completedCount + additionalCompleted;
         
         // If syllabus doesn't have topics defined yet, we'll just use the study plan totals as a rough metric or 0
         const displayTotal = Math.max(subTotalTopics, plan.filter((p: any) => p.subjectId === sub.id).length);

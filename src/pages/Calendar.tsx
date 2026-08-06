@@ -21,12 +21,26 @@ interface Task {
   category: string;
 }
 
+interface DailyLogEntry {
+  id: string;
+  date: string;
+  logType?: string;
+  category?: string;
+  timeFrom?: string;
+  timeTo?: string;
+  subjectName?: string;
+  chapterName?: string;
+  topicName?: string;
+  activityDetail?: string;
+}
+
 export default function Calendar() {
   const { currentUser } = useAuth();
   const isStudent = currentUser?.role === 'Student';
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<Event[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [dailyLogs, setDailyLogs] = useState<DailyLogEntry[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [newEvent, setNewEvent] = useState<Partial<Event>>({
@@ -39,6 +53,9 @@ export default function Calendar() {
 
     const savedTasks = localStorage.getItem('dugu_tasks');
     if (savedTasks) setTasks(JSON.parse(savedTasks));
+
+    const savedLogs = localStorage.getItem('dugu_daily_logs');
+    if (savedLogs) setDailyLogs(JSON.parse(savedLogs));
   }, []);
 
   const saveEvents = (newEvents: Event[]) => {
@@ -85,7 +102,8 @@ export default function Calendar() {
   const getEventsForDate = (dateStr: string) => {
     const dayEvents = events.filter(e => e.date === dateStr);
     const dayTasks = tasks.filter(t => t.dueDate === dateStr);
-    return { dayEvents, dayTasks };
+    const dayLogs = dailyLogs.filter(l => l.date === dateStr);
+    return { dayEvents, dayTasks, dayLogs };
   };
 
   const getTypeColor = (type: string) => {
@@ -111,7 +129,7 @@ export default function Calendar() {
     // Actual days
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const { dayEvents, dayTasks } = getEventsForDate(dateStr);
+      const { dayEvents, dayTasks, dayLogs } = getEventsForDate(dateStr);
       const isToday = new Date().toISOString().split('T')[0] === dateStr;
 
       days.push(
@@ -150,6 +168,21 @@ export default function Calendar() {
               >
                 <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></div>
                 <span className="truncate">{task.title}</span>
+              </div>
+            ))}
+            {dayLogs && dayLogs.map(log => (
+              <div 
+                key={`log-${log.id}`}
+                className="text-[10px] sm:text-xs truncate px-1.5 py-0.5 rounded border flex items-center justify-between gap-1 bg-teal-50 text-teal-700 border-teal-200 cursor-default group/log"
+                title={`${log.timeFrom || ''} - ${log.logType} ${log.subjectName ? `(${log.subjectName})` : ''} ${log.activityDetail || ''}`}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-1 overflow-hidden">
+                  <span className="truncate">
+                    {log.timeFrom && <span className="font-semibold mr-1">{log.timeFrom}</span>}
+                    {log.logType === 'Activity' || log.logType === 'Play' ? log.activityDetail : (log.subjectName || log.logType)}
+                  </span>
+                </div>
               </div>
             ))}
             {dayEvents.map(event => (

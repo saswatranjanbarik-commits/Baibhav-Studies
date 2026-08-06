@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2, Download } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2, Download, Layers, Clock } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
 interface SubTopic {
@@ -57,6 +58,7 @@ export default function Syllabus() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [dailyLogs, setDailyLogs] = useState<any[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem('dugu_syllabus_v2');
@@ -68,6 +70,9 @@ export default function Syllabus() {
       setSubjects(DEFAULT_SUBJECTS);
       setActiveSubjectId(DEFAULT_SUBJECTS[0].id);
     }
+
+    const savedLogs = localStorage.getItem('dugu_daily_logs');
+    if (savedLogs) setDailyLogs(JSON.parse(savedLogs));
   }, []);
 
   const saveSubjects = (newSubjects: Subject[]) => {
@@ -440,6 +445,12 @@ export default function Syllabus() {
 
                   {expandedNodes[chapter.id] && (
                     <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2">
+                      <div className="pl-6 mb-3">
+                        <Link to="/flashcards" className="inline-flex items-center gap-1.5 text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md transition-colors">
+                          <Layers className="h-3.5 w-3.5" />
+                          Flashcards & Quizzes for this Chapter
+                        </Link>
+                      </div>
                       {!chapter.topics.length && <p className="text-xs text-slate-400 italic pl-6">No topics added.</p>}
                       {chapter.topics.map(topic => (
                         <div key={topic.id} className="ml-6">
@@ -489,6 +500,32 @@ export default function Syllabus() {
                                   </div>
                                 </div>
                               ))}
+                              
+                              <div className="mt-3 mb-2 pt-2 border-t border-slate-100 pl-2">
+                                <Link to="/flashcards" className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md transition-colors">
+                                  <Layers className="h-3.5 w-3.5" />
+                                  Flashcards & Quizzes for this Topic
+                                </Link>
+                                
+                                <div className="mt-3 space-y-2">
+                                  <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Activity Log</h4>
+                                  {dailyLogs.filter(l => l.topicId === topic.id).length === 0 ? (
+                                    <p className="text-xs text-slate-400 italic">No activity logged for this topic yet.</p>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      {dailyLogs.filter(l => l.topicId === topic.id).map(log => (
+                                        <div key={log.id} className="flex items-start gap-2 bg-slate-50 p-2 rounded text-xs border border-slate-100">
+                                          <Clock className="h-3.5 w-3.5 text-slate-400 mt-0.5" />
+                                          <div>
+                                            <div className="font-semibold text-slate-700">{log.date} {log.timeFrom && log.timeTo ? `(${log.timeFrom} - ${log.timeTo})` : ''}</div>
+                                            <div className="text-slate-600">{log.logType}: {log.status}</div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           )}
                         </div>
