@@ -1,10 +1,15 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged } from "firebase/auth";
+import { initializeAuth, GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged, browserSessionPersistence, inMemoryPersistence, browserPopupRedirectResolver } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+
+export const auth = initializeAuth(app, {
+  persistence: [browserSessionPersistence, inMemoryPersistence],
+  popupRedirectResolver: browserPopupRedirectResolver
+});
+
 export const db = (firebaseConfig as any).firestoreDatabaseId 
   ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
   : getFirestore(app);
@@ -38,6 +43,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     isSigningIn = true;
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
+    
     if (!credential?.accessToken) {
       throw new Error('Failed to get access token from Firebase Auth');
     }

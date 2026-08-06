@@ -6,6 +6,7 @@ import { db } from "./firebase";
 
 export interface AppUser {
   id: string;
+  email: string;
   username: string;
   role: string;
   timezone: string;
@@ -34,20 +35,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        if (!user.email) {
+          setCurrentUser(null);
+          setLoading(false);
+          return;
+        }
+
         let appUser: AppUser = {
           id: user.uid,
+          email: user.email,
           username: user.displayName || user.email || 'User',
           role: user.email === 'saswatranjanbarik@gmail.com' ? 'Admin' : 'Student',
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
         try {
-          const userRef = doc(db, 'users', user.uid);
+          const userRef = doc(db, 'users', user.email.toLowerCase());
           let userDoc = await getDoc(userRef);
           
           if (!userDoc.exists()) {
             await setDoc(userRef, appUser);
           } else {
-            appUser = userDoc.data() as AppUser;
+            const data = userDoc.data();
+            appUser = { ...appUser, ...data } as AppUser;
             if (user.email === 'saswatranjanbarik@gmail.com' && appUser.role !== 'Admin') {
               appUser.role = 'Admin';
               await setDoc(userRef, appUser, { merge: true });

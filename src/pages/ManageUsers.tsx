@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, X, Search, Edit2, Trash2, Globe, Shield, User, UserCheck, Key, Lock, AlertTriangle } from 'lucide-react';
-
-interface UserObj {
-  id: string;
-  username: string;
-  password?: string;
-  role: 'Admin' | 'Teacher' | 'Student';
-  timezone: string;
-}
+import { Users, Plus, X, Search, Edit2, Trash2, Globe, Shield, User, Mail, AlertTriangle } from 'lucide-react';
+import { collection, doc, getDocs, setDoc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { AppUser } from '../lib/AuthContext';
 
 const TIMEZONES = [
   "UTC-12:00 (International Date Line West)",
@@ -41,174 +36,149 @@ const TIMEZONES = [
   "UTC+14:00 (Line Islands Time)"
 ];
 
-const DEFAULT_USERS: UserObj[] = [
-  {
-    id: '1',
-    username: 'Saswat',
-    password: 'admin123',
-    role: 'Admin',
-    timezone: 'UTC+05:30 (Indian Standard Time)'
-  }
-];
-
 export default function ManageUsers() {
-  const [users, setUsers] = useState<UserObj[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
   
-  const [newUser, setNewUser] = useState<Partial<UserObj>>({
+  const [newUser, setNewUser] = useState<Partial<AppUser>>({
     role: 'Student',
     timezone: 'UTC (Coordinated Universal Time)'
   });
   
-  const [editingUser, setEditingUser] = useState<UserObj | null>(null);
+  const [editingUser, setEditingUser] = useState<AppUser | null>(null);
 
   useEffect(() => {
-    const savedUsers = localStorage.getItem('dugu_users_v2');
-    if (savedUsers) {
-      setUsers(JSON.parse(savedUsers));
-    } else {
-      setUsers(DEFAULT_USERS);
-      localStorage.setItem('dugu_users_v2', JSON.stringify(DEFAULT_USERS));
-    }
+    const q = query(collection(db, 'users'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const usersData: AppUser[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data() as AppUser;
+        // In case email isn't in doc but is the ID
+        if (!data.email) data.email = doc.id;
+        usersData.push(data);
+      });
+      setUsers(usersData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching users:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const saveUsers = (newUsers: UserObj[]) => {
-    setUsers(newUsers);
-    localStorage.setItem('dugu_users_v2', JSON.stringify(newUsers));
-  };
-
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUser.username) return;
+    if (!newUser.email || !newUser.username) return;
 
-    if (editingUser) {
-      const updated = users.map(u => {
-        if (u.id === editingUser.id) {
-          return {
-            ...u,
-            username: newUser.username as string,
-            password: newUser.password ? newUser.password : u.password,
-            role: newUser.role as any,
-            timezone: newUser.timezone as string
-          };
-        }
-        return u;
-      });
-      saveUsers(updated);
-      setEditingUser(null);
-    } else {
-      if (!newUser.password) {
-        alert("Password is required for new users.");
-        return;
-      }
-      const user: UserObj = {
-        id: Date.now().toString(),
+    try {
+      const email = newUser.email.toLowerCase();
+      const userRef = doc(db, 'users', email);
+      
+      const userData = {
+        email: email,
         username: newUser.username,
-        password: newUser.password,
-        role: newUser.role as any,
-        timezone: newUser.timezone as string,
+        role: newUser.role,
+        timezone: newUser.timezone,
+        id: editingUser?.id || `pre-registered-${Date.now()}` // Only used if they haven't signed in yet
       };
-      saveUsers([user, ...users]);
-    }
 
-    setShowAddModal(false);
-    setNewUser({ role: 'Student', timezone: 'UTC (Coordinated Universal Time)' });
+      await setDoc(userRef, userData, { merge: true });
+      
+      setShowAddModal(false);
+      setEditingUser(null);
+      setNewUser({ role: 'Student', timezone: 'UTC (Coordinated Universal Time)' });
+    } catch (error) {
+      console.error("Error saving user:", error);
+      alert("Failed to save user. Check permissions.");
+    }
   };
 
-  const handleDelete = (id: string) => {
-    const user = users.find(u => u.id === id);
-    if (user?.role === 'Admin' && user?.username === 'Saswat') {
+  const handleDelete = async (email: string) => {
+    if (email === 'saswatranjanbarik@gmail.com') {
       alert("Cannot delete the primary Admin account.");
       return;
     }
     
-    if (confirm('Are you sure you want to remove this user?')) {
-      saveUsers(users.filter(u => u.id !== id));
+    if (confirm('Are you sure you want to remove this user? They will lose access to their role.')) {
+      try {
+        await deleteDoc(doc(db, 'users', email));
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        alert("Failed to delete user.");
+      }
     }
   };
 
   const filteredUsers = users.filter(u => 
     u.username.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
     u.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleClearData = () => {
-    if (confirm("WARNING: This will clear ALL app data (except users) for all users! Are you absolutely sure?")) {
-      const usersBackup = localStorage.getItem('dugu_users_v2');
-      const currentUserBackup = localStorage.getItem('dugu_currentUser_v2');
-      
-      localStorage.clear();
-      
-      if (usersBackup) localStorage.setItem('dugu_users_v2', usersBackup);
-      if (currentUserBackup) localStorage.setItem('dugu_currentUser_v2', currentUserBackup);
-      
-      alert("All app data has been cleared.");
-      window.location.reload();
+  const getRoleBadge = (role: string) => {
+    switch(role) {
+      case 'Admin': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'Teacher': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+      default: return 'bg-emerald-100 text-emerald-700 border-emerald-200';
     }
   };
 
   const getRoleIcon = (role: string) => {
     switch(role) {
-      case 'Admin': return <Shield className="h-4 w-4 text-purple-600" />;
-      case 'Teacher': return <UserCheck className="h-4 w-4 text-blue-600" />;
-      case 'Student': return <User className="h-4 w-4 text-emerald-600" />;
-      default: return <User className="h-4 w-4 text-slate-600" />;
+      case 'Admin': return <Shield className="h-3.5 w-3.5" />;
+      case 'Teacher': return <Users className="h-3.5 w-3.5" />;
+      default: return <User className="h-3.5 w-3.5" />;
     }
   };
 
-  const getRoleBadge = (role: string) => {
-    switch(role) {
-      case 'Admin': return 'bg-purple-100 text-purple-700 border-purple-200';
-      case 'Teacher': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'Student': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-      default: return 'bg-slate-100 text-slate-700 border-slate-200';
-    }
-  };
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center text-slate-500">Loading users...</div>;
+  }
 
   return (
-    <div className="max-w-7xl mx-auto pb-12">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
-            <Users className="h-6 w-6 text-blue-600" /> Manage Users
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">Add, remove, and configure roles (Admin, Teacher, Student) across different timezones.</p>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Manage Users</h1>
+          <p className="mt-2 text-sm text-slate-500">Control access levels, roles, and settings for all platform users.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleClearData}
-            className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 text-sm font-semibold rounded-lg hover:bg-red-100 shadow-sm flex items-center gap-2 transition-colors"
-          >
-            <AlertTriangle className="h-4 w-4" /> Clear All Data
-          </button>
-          <button
-            onClick={() => {
-              setEditingUser(null);
-              setNewUser({ role: 'Student', timezone: 'UTC (Coordinated Universal Time)' });
-              setShowAddModal(true);
-            }}
-            className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Add User
-          </button>
-        </div>
+        <button 
+          onClick={() => {
+            setEditingUser(null);
+            setNewUser({ role: 'Student', timezone: 'UTC (Coordinated Universal Time)' });
+            setShowAddModal(true);
+          }}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-sm transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Add / Invite User
+        </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-        <div className="p-4 border-b border-slate-200 bg-slate-50">
-          <div className="relative w-full sm:max-w-md">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* Main Content */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+        {/* Toolbar */}
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Search by username or role..." 
+              placeholder="Search users..." 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-full bg-white"
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             />
+          </div>
+          <div className="text-sm font-medium text-slate-500">
+            Total Users: <span className="text-slate-900 font-bold">{users.length}</span>
           </div>
         </div>
 
+        {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
@@ -221,14 +191,15 @@ export default function ManageUsers() {
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredUsers.length > 0 ? filteredUsers.map(user => (
-                <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
+                <tr key={user.email || user.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-inner bg-indigo-500`}>
-                        {user.username.charAt(0).toUpperCase()}
+                        {user.username ? user.username.charAt(0).toUpperCase() : (user.email ? user.email.charAt(0).toUpperCase() : '?')}
                       </div>
                       <div>
                         <p className="font-bold text-slate-900">{user.username}</p>
+                        <p className="text-xs text-slate-500">{user.email}</p>
                       </div>
                     </div>
                   </td>
@@ -248,7 +219,7 @@ export default function ManageUsers() {
                       <button 
                         onClick={() => {
                           setEditingUser(user);
-                          setNewUser({ ...user, password: '' });
+                          setNewUser({ ...user });
                           setShowAddModal(true);
                         }}
                         className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
@@ -256,13 +227,13 @@ export default function ManageUsers() {
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button 
-                        onClick={() => handleDelete(user.id)}
+                        onClick={() => user.email && handleDelete(user.email)}
                         className={`p-2 rounded-lg transition-colors ${
-                          user.role === 'Admin' && user.username === 'Saswat' 
+                          user.email === 'saswatranjanbarik@gmail.com' 
                             ? 'text-slate-300 cursor-not-allowed' 
                             : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
                         }`}
-                        disabled={user.role === 'Admin' && user.username === 'Saswat'}
+                        disabled={user.email === 'saswatranjanbarik@gmail.com'}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -287,7 +258,7 @@ export default function ManageUsers() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-lg font-bold text-slate-900">
-                {editingUser ? 'Edit User' : 'Add New User'}
+                {editingUser ? 'Edit User' : 'Register / Add New User'}
               </h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="h-5 w-5" />
@@ -295,8 +266,32 @@ export default function ManageUsers() {
             </div>
             
             <form onSubmit={handleAddUser} className="p-6 overflow-y-auto flex-1 space-y-4">
+              
+              {!editingUser && (
+                <div className="mb-4 bg-blue-50 text-blue-800 p-3 rounded-lg text-xs flex items-start gap-2 border border-blue-200">
+                  <Shield className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <p>Registering a user allows you to pre-assign their role. When they sign in using this Google email, they will automatically receive the permissions below.</p>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Username *</label>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Email Address *</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="email"
+                    required
+                    value={newUser.email || ''}
+                    onChange={e => setNewUser({...newUser, email: e.target.value})}
+                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm disabled:bg-slate-100"
+                    placeholder="e.g. student@gmail.com"
+                    disabled={!!editingUser}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Display Name *</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
@@ -305,25 +300,7 @@ export default function ManageUsers() {
                     value={newUser.username || ''}
                     onChange={e => setNewUser({...newUser, username: e.target.value})}
                     className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
-                    placeholder="e.g. JohnStudent"
-                    disabled={editingUser?.role === 'Admin' && editingUser?.username === 'Saswat'}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                  {editingUser ? 'New Password (Leave blank to keep current)' : 'Password *'}
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <input
-                    type="password"
-                    required={!editingUser}
-                    value={newUser.password || ''}
-                    onChange={e => setNewUser({...newUser, password: e.target.value})}
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
-                    placeholder="Enter password"
+                    placeholder="e.g. John Doe"
                   />
                 </div>
               </div>
@@ -335,7 +312,7 @@ export default function ManageUsers() {
                   value={newUser.role || 'Student'}
                   onChange={e => setNewUser({...newUser, role: e.target.value as any})}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
-                  disabled={editingUser?.role === 'Admin' && editingUser?.username === 'Saswat'}
+                  disabled={editingUser?.email === 'saswatranjanbarik@gmail.com'}
                 >
                   <option value="Admin">Admin</option>
                   <option value="Teacher">Teacher</option>
@@ -374,7 +351,7 @@ export default function ManageUsers() {
                   type="submit"
                   className="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
                 >
-                  {editingUser ? 'Save Changes' : 'Add User'}
+                  {editingUser ? 'Save Changes' : 'Register User'}
                 </button>
               </div>
             </form>
@@ -384,4 +361,3 @@ export default function ManageUsers() {
     </div>
   );
 }
-
