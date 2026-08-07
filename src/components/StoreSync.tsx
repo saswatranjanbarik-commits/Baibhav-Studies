@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
@@ -6,13 +6,15 @@ import { useAuth } from '../lib/AuthContext';
 export default function StoreSync({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { currentUser } = useAuth();
+  
+  // Keep track of what the cloud told us last, so we can detect stale overwrites vs deliberate deletions
+  const lastKnownCloudData = useRef<Record<string, any>>({});
 
   useEffect(() => {
     let originalSetItem = window.localStorage.setItem;
     let originalRemoveItem = window.localStorage.removeItem;
     let originalClear = window.localStorage.clear;
     
-    // Use a single shared global store so all users see the pre-existing data
     const storeDocId = 'global_store';
     const storeRef = doc(db, 'appStore', storeDocId);
 
@@ -27,32 +29,9 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
     const unsubscribe = onSnapshot(storeRef, async (docSnap) => {
       let data = docSnap.exists() ? docSnap.data() : {};
       
-      // MIGRATION: Push existing local data to cloud if it's not in the cloud yet
-      let needsCloudUpload = false;
-      const localUploads: Record<string, any> = {};
+      // Update our reference of what the cloud state is
+      lastKnownCloudData.current = JSON.parse(JSON.stringify(data));
       
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const key = window.localStorage.key(i);
-        if (key && key.startsWith('dugu_')) {
-          // If the cloud doesn't have this key, we should upload our local version
-          if (data[key] === undefined) {
-            const localValue = window.localStorage.getItem(key);
-            if (localValue) {
-              try {
-                localUploads[key] = JSON.parse(localValue);
-                needsCloudUpload = true;
-                data[key] = localUploads[key]; // immediately use it locally
-              } catch (e) {}
-            }
-          }
-        }
-      }
-
-      if (needsCloudUpload) {
-        console.log("Uploading existing local data to cloud...", localUploads);
-        setDoc(storeRef, localUploads, { merge: true }).catch(console.error);
-      }
-
       // Populate local storage with cloud data
       let changed = false;
       for (const [key, value] of Object.entries(data)) {
@@ -100,19 +79,40 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
                                     (existingValue.length > 0 && typeof existingValue[0] === 'object' && existingValue[0] !== null && 'id' in existingValue[0]);
               
               if (isObjectArray) {
-                if (parsedValue.length < existingValue.length) {
-                  // Assume deletion, trust the new array
-                  mergedValue = parsedValue;
-                } else {
-                  const map = new Map();
-                  existingValue.forEach((item: any) =>item => {
-                    if (item && item.id) map.set(item.id, item);
-                  });
-                  parsedValue.forEach((item: any) =>item => {
-                    if (item && item.id) map.set(item.id, item);
-                  });
-                  mergedValue = Array.from(map.values());
-                }
+                const existingCloudArray = existingValue;
+                const lastKnownArray = lastKnownCloudData.current[key] || [];
+                const userNewArray = parsedValue;
+
+                const lastKnownMap = new Map();
+                lastKnownArray.forEach((item: any) => { if (item && item.id) lastKnownMap.set(item.id, item); });
+
+                const userNewMap = new Map();
+                userNewArray.forEach((item: any) => { if (item && item.id) userNewMap.set(item.id, item); });
+
+                const mergedMap = new Map();
+
+                existingCloudArray.forEach((item: any) => {
+                  if (item && item.id) {
+                    if (userNewMap.has(item.id)) {
+                      mergedMap.set(item.id, userNewMap.get(item.id));
+                    } else {
+                      if (lastKnownMap.has(item.id)) {
+                        // User knew about it and deleted it. (Do not add to mergedMap)
+                      } else {
+                        // User never knew about it (added by another client). Preserve it!
+                        mergedMap.set(item.id, item);
+                      }
+                    }
+                  }
+                });
+
+                userNewArray.forEach((item: any) => {
+                  if (item && item.id && !mergedMap.has(item.id)) {
+                    mergedMap.set(item.id, item);
+                  }
+                });
+
+                mergedValue = Array.from(mergedMap.values());
               } else {
                 mergedValue = Array.from(new Set([...existingValue, ...parsedValue]));
               }
@@ -130,9 +130,6 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
 
     return () => {
       unsubscribe();
-      
-      
-
       window.localStorage.setItem = originalSetItem;
       window.localStorage.removeItem = originalRemoveItem;
       window.localStorage.clear = originalClear;
