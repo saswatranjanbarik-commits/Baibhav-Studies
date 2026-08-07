@@ -25,17 +25,17 @@ interface Subject {
   id: string;
   name: string;
   chapters: Chapter[];
-  category?: 'Main' | 'Pebble';
+  category?: 'Rock' | 'Pebble' | 'Sand';
 }
 
 const DEFAULT_SUBJECTS: Subject[] = [
-  { id: '1', name: 'English', chapters: [], category: 'Main' },
-  { id: '2', name: 'Hindi', chapters: [], category: 'Main' },
-  { id: '3', name: 'Odia', chapters: [], category: 'Main' },
-  { id: '4', name: 'Mathematics', chapters: [], category: 'Main' },
-  { id: '5', name: 'Science', chapters: [], category: 'Main' },
-  { id: '6', name: 'Social Studies', chapters: [], category: 'Main' },
-  { id: '7', name: 'Computer Science', chapters: [], category: 'Pebble' },
+  { id: '1', name: 'English', chapters: [], category: 'Rock' },
+  { id: '2', name: 'Hindi', chapters: [], category: 'Rock' },
+  { id: '3', name: 'Odia', chapters: [], category: 'Rock' },
+  { id: '4', name: 'Mathematics', chapters: [], category: 'Rock' },
+  { id: '5', name: 'Science', chapters: [], category: 'Rock' },
+  { id: '6', name: 'Social Studies', chapters: [], category: 'Rock' },
+  { id: '7', name: 'Computer Science', chapters: [], category: 'Rock' },
   { id: '8', name: 'Moral Science', chapters: [], category: 'Pebble' },
   { id: '9', name: 'General Knowledge', chapters: [], category: 'Pebble' },
 ];
@@ -49,7 +49,10 @@ export default function Syllabus() {
   
   const [showAddSubject, setShowAddSubject] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
-  const [newSubjectCategory, setNewSubjectCategory] = useState<'Main'|'Pebble'>('Main');
+  const [showEditSubject, setShowEditSubject] = useState(false);
+  const [editSubjectName, setEditSubjectName] = useState('');
+  const [editSubjectCategory, setEditSubjectCategory] = useState<'Rock'|'Pebble'|'Sand'>('Rock');
+  const [newSubjectCategory, setNewSubjectCategory] = useState<'Rock'|'Pebble'|'Sand'>('Rock');
 
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
 
@@ -127,10 +130,22 @@ export default function Syllabus() {
     saveSubjects(newSubs);
     setActiveSubjectId(newId);
     setNewSubjectName('');
-    setNewSubjectCategory('Main');
+    setNewSubjectCategory('Rock');
     setShowAddSubject(false);
   };
 
+  const handleEditSubjectSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editSubjectName.trim() || !activeSubject) return;
+    const updatedSubjects = subjects.map(s => {
+      if (s.id === activeSubject.id) {
+        return { ...s, name: editSubjectName, category: editSubjectCategory };
+      }
+      return s;
+    });
+    saveSubjects(updatedSubjects);
+    setShowEditSubject(false);
+  };
   const activeSubject = subjects.find(s => s.id === activeSubjectId);
 
   const toggleNode = (id: string) => {
@@ -415,11 +430,11 @@ export default function Syllabus() {
 
       {/* Subject Tabs */}
       <div className="mb-6 space-y-4">
-        {subjects.some(s => s.category !== 'Pebble') && (
+        {subjects.some(s => s.category !== 'Pebble' && s.category !== 'Sand') && (
           <div>
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Main Subjects</h4>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Rock Subjects (Main)</h4>
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              {subjects.filter(s => s.category !== 'Pebble').map(s => (
+              {subjects.filter(s => s.category !== 'Pebble' && s.category !== 'Sand').map(s => (
                 <button
                   key={s.id}
                   onClick={() => setActiveSubjectId(s.id)}
@@ -456,6 +471,27 @@ export default function Syllabus() {
             </div>
           </div>
         )}
+
+        {subjects.some(s => s.category === 'Sand') && (
+          <div>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> Sand Subjects</h4>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {subjects.filter(s => s.category === 'Sand').map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setActiveSubjectId(s.id)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                    activeSubjectId === s.id 
+                      ? "bg-amber-600 text-white shadow-sm" 
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm min-h-[500px]">
         {/* Active Subject Header */}
@@ -470,12 +506,26 @@ export default function Syllabus() {
             </div>
           </div>
           {!isStudent && activeSubject && (
-            <button 
-              onClick={() => setShowAddNode({ type: 'chapter' })}
-              className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" /> Add Chapter
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => {
+                  if(activeSubject) {
+                    setEditSubjectName(activeSubject.name);
+                    setEditSubjectCategory(activeSubject.category || 'Rock');
+                    setShowEditSubject(true);
+                  }
+                }}
+                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Pencil className="h-4 w-4" /> Edit Subject
+              </button>
+              <button 
+                onClick={() => setShowAddNode({ type: 'chapter' })}
+                className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" /> Add Chapter
+              </button>
+            </div>
           )}
         </div>
 
@@ -636,6 +686,68 @@ export default function Syllabus() {
       </div>
 
       {/* Add Node / Subject Modals... */}
+      {showEditSubject && activeSubject && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="text-lg font-bold text-slate-900">Edit Subject</h3>
+              <button onClick={() => setShowEditSubject(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleEditSubjectSubmit} className="p-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Subject Name</label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={editSubjectName}
+                  onChange={e => setEditSubjectName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder="Enter subject name..."
+                />
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Category</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="edit_category" value="Rock" checked={editSubjectCategory === 'Rock'} onChange={() => setEditSubjectCategory('Rock')} className="text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm text-slate-700">Rock (Main)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="edit_category" value="Pebble" checked={editSubjectCategory === 'Pebble'} onChange={() => setEditSubjectCategory('Pebble')} className="text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm text-slate-700">Pebble (Medium)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="edit_category" value="Sand" checked={editSubjectCategory === 'Sand'} onChange={() => setEditSubjectCategory('Sand')} className="text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm text-slate-700">Sand (Extra)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSubject(false)}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showAddSubject && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
@@ -663,12 +775,16 @@ export default function Syllabus() {
                 <label className="block text-sm font-bold text-slate-700 mb-1.5">Category</label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="category" value="Main" checked={newSubjectCategory === 'Main'} onChange={() => setNewSubjectCategory('Main')} className="text-indigo-600 focus:ring-indigo-500" />
-                    <span className="text-sm text-slate-700">Main Subject</span>
+                    <input type="radio" name="category" value="Rock" checked={newSubjectCategory === 'Rock'} onChange={() => setNewSubjectCategory('Rock')} className="text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm text-slate-700">Rock (Main)</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="category" value="Pebble" checked={newSubjectCategory === 'Pebble'} onChange={() => setNewSubjectCategory('Pebble')} className="text-indigo-600 focus:ring-indigo-500" />
-                    <span className="text-sm text-slate-700">Pebble (Extra)</span>
+                    <span className="text-sm text-slate-700">Pebble (Medium)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="category" value="Sand" checked={newSubjectCategory === 'Sand'} onChange={() => setNewSubjectCategory('Sand')} className="text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm text-slate-700">Sand (Extra)</span>
                   </label>
                 </div>
               </div>

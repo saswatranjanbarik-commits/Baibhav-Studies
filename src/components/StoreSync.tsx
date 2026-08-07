@@ -124,6 +124,9 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem = function(key, value) {
       originalSetItem.call(this, key, value);
       
+      // Dispatch locally so other components update immediately!
+      window.dispatchEvent(new Event('cloud_sync_update'));
+      
       if (!currentUser) return; // Only sync if logged in
       
       try {
@@ -141,9 +144,69 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
           const updatesToPush = { ...pendingUpdates };
           pendingUpdates = {}; // Clear pending
           
-          setDoc(storeRef, updatesToPush, { merge: true })
-            .catch(e => console.error("Cloud sync error for setItem:", e));
-        }, 500); // 500ms debounce for near real-time sync
+          runTransaction(db, async (transaction) => {
+            const docSnap = await transaction.get(storeRef);
+            const currentData = docSnap.exists() ? docSnap.data() : {};
+            
+            const finalUpdates: Record<string, any> = {};
+            
+            for (const [k, newVal] of Object.entries(updatesToPush)) {
+              const existingValue = currentData[k];
+              let mergedValue: any = newVal;
+              
+              if (existingValue !== undefined) {
+                if (Array.isArray(existingValue) && Array.isArray(newVal)) {
+                  const isObjectArray = (newVal.length > 0 && typeof newVal[0] === 'object' && newVal[0] !== null && 'id' in newVal[0]) ||
+                                        (existingValue.length > 0 && typeof existingValue[0] === 'object' && existingValue[0] !== null && 'id' in existingValue[0]);
+                  
+                  if (isObjectArray) {
+                    const existingCloudArray = existingValue;
+                    const lastKnownArray = lastKnownCloudData.current[k] || [];
+                    const userNewArray = newVal;
+
+                    const lastKnownMap = new Map();
+                    lastKnownArray.forEach((item: any) => { if (item && item.id) lastKnownMap.set(item.id, item); });
+
+                    const userNewMap = new Map();
+                    userNewArray.forEach((item: any) => { if (item && item.id) userNewMap.set(item.id, item); });
+
+                    const mergedMap = new Map();
+
+                    existingCloudArray.forEach((item: any) => {
+                      if (item && item.id) {
+                        if (userNewMap.has(item.id)) {
+                          mergedMap.set(item.id, userNewMap.get(item.id));
+                        } else {
+                          if (lastKnownMap.has(item.id)) {
+                            // User knew about it and deleted it
+                          } else {
+                            // User never knew about it, preserve it
+                            mergedMap.set(item.id, item);
+                          }
+                        }
+                      }
+                    });
+
+                    userNewArray.forEach((item: any) => {
+                      if (item && item.id && !mergedMap.has(item.id)) {
+                        mergedMap.set(item.id, item);
+                      }
+                    });
+
+                    mergedValue = Array.from(mergedMap.values());
+                  } else {
+                    mergedValue = Array.from(new Set([...existingValue, ...newVal]));
+                  }
+                } else if (typeof existingValue === 'object' && existingValue !== null && typeof newVal === 'object' && newVal !== null) {
+                  mergedValue = { ...existingValue, ...newVal };
+                }
+              }
+              finalUpdates[k] = mergedValue;
+            }
+            
+            transaction.set(storeRef, finalUpdates, { merge: true });
+          }).catch(e => console.error("Cloud sync transaction error for setItem:", e));
+        }, 800); // 800ms debounce for near real-time sync with transaction
       } catch (e) {
         console.error(e);
       }
