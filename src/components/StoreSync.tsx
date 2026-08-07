@@ -117,6 +117,9 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
+    let syncTimeout: any;
+    let pendingUpdates: Record<string, any> = {};
+
     // Intercept setItem to also write to the cloud
     window.localStorage.setItem = function(key, value) {
       originalSetItem.call(this, key, value);
@@ -129,64 +132,79 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
           parsedValue = JSON.parse(value);
         } catch(e) {}
         
-        // Use a transaction to safely merge arrays and objects
-        runTransaction(db, async (transaction) => {
-          const docSnap = await transaction.get(storeRef);
-          const currentData = docSnap.exists() ? docSnap.data() : {};
-          const existingValue = currentData[key];
+        // Accumulate pending updates
+        pendingUpdates[key] = parsedValue;
+        
+        // Debounce the cloud write to avoid transaction contention and rate limits
+        clearTimeout(syncTimeout);
+        syncTimeout = setTimeout(() => {
+          const updatesToPush = { ...pendingUpdates };
+          pendingUpdates = {}; // Clear pending
           
-          let mergedValue: any = parsedValue;
-          
-          if (existingValue !== undefined) {
-            if (Array.isArray(existingValue) && Array.isArray(parsedValue)) {
-              const isObjectArray = (parsedValue.length > 0 && typeof parsedValue[0] === 'object' && parsedValue[0] !== null && 'id' in parsedValue[0]) ||
-                                    (existingValue.length > 0 && typeof existingValue[0] === 'object' && existingValue[0] !== null && 'id' in existingValue[0]);
+          runTransaction(db, async (transaction) => {
+            const docSnap = await transaction.get(storeRef);
+            const currentData = docSnap.exists() ? docSnap.data() : {};
+            
+            const finalUpdates: Record<string, any> = {};
+            
+            for (const [k, newVal] of Object.entries(updatesToPush)) {
+              const existingValue = currentData[k];
+              let mergedValue: any = newVal;
               
-              if (isObjectArray) {
-                const existingCloudArray = existingValue;
-                const lastKnownArray = lastKnownCloudData.current[key] || [];
-                const userNewArray = parsedValue;
+              if (existingValue !== undefined) {
+                if (Array.isArray(existingValue) && Array.isArray(newVal)) {
+                  const isObjectArray = (newVal.length > 0 && typeof newVal[0] === 'object' && newVal[0] !== null && 'id' in newVal[0]) ||
+                                        (existingValue.length > 0 && typeof existingValue[0] === 'object' && existingValue[0] !== null && 'id' in existingValue[0]);
+                  
+                  if (isObjectArray) {
+                    const existingCloudArray = existingValue;
+                    const lastKnownArray = lastKnownCloudData.current[k] || [];
+                    const userNewArray = newVal;
 
-                const lastKnownMap = new Map();
-                lastKnownArray.forEach((item: any) => { if (item && item.id) lastKnownMap.set(item.id, item); });
+                    const lastKnownMap = new Map();
+                    lastKnownArray.forEach((item: any) => { if (item && item.id) lastKnownMap.set(item.id, item); });
 
-                const userNewMap = new Map();
-                userNewArray.forEach((item: any) => { if (item && item.id) userNewMap.set(item.id, item); });
+                    const userNewMap = new Map();
+                    userNewArray.forEach((item: any) => { if (item && item.id) userNewMap.set(item.id, item); });
 
-                const mergedMap = new Map();
+                    const mergedMap = new Map();
 
-                existingCloudArray.forEach((item: any) => {
-                  if (item && item.id) {
-                    if (userNewMap.has(item.id)) {
-                      mergedMap.set(item.id, userNewMap.get(item.id));
-                    } else {
-                      if (lastKnownMap.has(item.id)) {
-                        // User knew about it and deleted it. (Do not add to mergedMap)
-                      } else {
-                        // User never knew about it (added by another client). Preserve it!
+                    existingCloudArray.forEach((item: any) => {
+                      if (item && item.id) {
+                        if (userNewMap.has(item.id)) {
+                          mergedMap.set(item.id, userNewMap.get(item.id));
+                        } else {
+                          if (lastKnownMap.has(item.id)) {
+                            // User knew about it and deleted it
+                          } else {
+                            // User never knew about it, preserve it
+                            mergedMap.set(item.id, item);
+                          }
+                        }
+                      }
+                    });
+
+                    userNewArray.forEach((item: any) => {
+                      if (item && item.id && !mergedMap.has(item.id)) {
                         mergedMap.set(item.id, item);
                       }
-                    }
-                  }
-                });
+                    });
 
-                userNewArray.forEach((item: any) => {
-                  if (item && item.id && !mergedMap.has(item.id)) {
-                    mergedMap.set(item.id, item);
+                    mergedValue = Array.from(mergedMap.values());
+                  } else {
+                    mergedValue = Array.from(new Set([...existingValue, ...newVal]));
                   }
-                });
-
-                mergedValue = Array.from(mergedMap.values());
-              } else {
-                mergedValue = Array.from(new Set([...existingValue, ...parsedValue]));
+                } else if (typeof existingValue === 'object' && existingValue !== null && typeof newVal === 'object' && newVal !== null) {
+                  mergedValue = { ...existingValue, ...newVal };
+                }
               }
-            } else if (typeof existingValue === 'object' && existingValue !== null && typeof parsedValue === 'object' && parsedValue !== null) {
-              mergedValue = { ...existingValue, ...parsedValue };
+              finalUpdates[k] = mergedValue;
             }
-          }
+            
+            transaction.set(storeRef, finalUpdates, { merge: true });
+          }).catch(e => console.error("Cloud sync transaction error for setItem:", e));
           
-          transaction.set(storeRef, { [key]: mergedValue }, { merge: true });
-        }).catch(e => console.error("Cloud sync transaction error for setItem:", e));
+        }, 1500); // 1.5 second debounce
       } catch (e) {
         console.error(e);
       }
