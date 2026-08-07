@@ -58,6 +58,7 @@ export default function ManageUsers() {
         const data = doc.data() as AppUser;
         // In case email isn't in doc but is the ID
         if (!data.email) data.email = doc.id;
+        (data as any)._docId = doc.id;
         usersData.push(data);
       });
       setUsers(usersData);
@@ -113,15 +114,15 @@ export default function ManageUsers() {
     }
   };
 
-  const handleDelete = async (email: string) => {
-    if (email === 'saswatranjanbarik@gmail.com') {
+  const handleDelete = async (user: any) => {
+    if (user.email === 'saswatranjanbarik@gmail.com') {
       alert("Cannot delete the primary Admin account.");
       return;
     }
     
     if (confirm('Are you sure you want to remove this user? They will lose access to their role.')) {
       try {
-        await deleteDoc(doc(db, 'users', email));
+        await deleteDoc(doc(db, 'users', user._docId || user.email));
       } catch (error) {
         console.error("Error deleting user:", error);
         alert("Failed to delete user.");
@@ -244,7 +245,7 @@ export default function ManageUsers() {
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button 
-                        onClick={() => user.email && handleDelete(user.email)}
+                        onClick={() => handleDelete(user)}
                         className={`p-2 rounded-lg transition-colors ${
                           user.email === 'saswatranjanbarik@gmail.com' 
                             ? 'text-slate-300 cursor-not-allowed' 

@@ -20,10 +20,10 @@ interface DailyLogEntry {
   subjectName?: string;
   chapterId?: string;
   chapterName?: string;
-  topicId?: string;
-  topicName?: string;
-  subTopicId?: string;
-  subTopicName?: string;
+  topicId?: string | string[];
+  topicName?: string | string[];
+  subTopicId?: string | string[];
+  subTopicName?: string | string[];
   status?: 'In Progress' | 'Completed' | 'Have Doubt';
   
   // Sand / Pebble
@@ -134,7 +134,7 @@ export default function DailyLog() {
 
   const activeSubject = syllabus.find(s => s.id === newLog.subjectId);
   const activeChapter = activeSubject?.chapters?.find((c: any) => c.id === newLog.chapterId);
-  const activeTopic = activeChapter?.topics?.find((t: any) => t.id === newLog.topicId);
+  const activeTopics = activeChapter?.topics?.filter((t: any) => Array.isArray(newLog.topicId) ? newLog.topicId.includes(t.id) : t.id === newLog.topicId) || [];
 
   const handlePlanSelect = (planId: string) => {
     setSelectedPlanId(planId);
@@ -192,10 +192,23 @@ export default function DailyLog() {
       log.subjectName = activeSubject?.name || '';
       log.chapterId = newLog.chapterId;
       log.chapterName = activeChapter?.name || '';
+      
       log.topicId = newLog.topicId;
-      log.topicName = activeTopic?.name || '';
+      if (Array.isArray(newLog.topicId)) {
+        log.topicName = activeTopics.map((t: any) => t.name).join(', ');
+      } else {
+        log.topicName = activeTopics[0]?.name || '';
+      }
+
       log.subTopicId = newLog.subTopicId;
-      log.subTopicName = activeTopic?.subTopics?.find((st: any) => st.id === newLog.subTopicId)?.name || '';
+      if (Array.isArray(newLog.subTopicId)) {
+        const allSubTopics = activeTopics.flatMap((t: any) => t.subTopics || []);
+        log.subTopicName = allSubTopics.filter((st: any) => newLog.subTopicId?.includes(st.id)).map((st: any) => st.name).join(', ');
+      } else {
+        const allSubTopics = activeTopics.flatMap((t: any) => t.subTopics || []);
+        log.subTopicName = allSubTopics.find((st: any) => st.id === newLog.subTopicId)?.name || '';
+      }
+
       log.status = (newLog.status as any) || 'In Progress';
     } else {
       if (!newLog.activityDetail) {
@@ -642,7 +655,7 @@ export default function DailyLog() {
                     <select
                       required
                       value={newLog.subjectId || ''}
-                      onChange={e => setNewLog({ ...newLog, subjectId: e.target.value, chapterId: '', topicId: '', subTopicId: '' })}
+                      onChange={e => setNewLog({ ...newLog, subjectId: e.target.value, chapterId: '', topicId: [], subTopicId: [] })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                     >
                       <option value="">Select Subject...</option>
@@ -655,7 +668,7 @@ export default function DailyLog() {
                       required
                       disabled={!activeSubject}
                       value={newLog.chapterId || ''}
-                      onChange={e => setNewLog({ ...newLog, chapterId: e.target.value, topicId: '', subTopicId: '' })}
+                      onChange={e => setNewLog({ ...newLog, chapterId: e.target.value, topicId: [], subTopicId: [] })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white disabled:bg-slate-50 disabled:text-slate-400"
                     >
                       <option value="">Select Chapter...</option>
@@ -664,27 +677,59 @@ export default function DailyLog() {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1.5">Topic</label>
-                    <select
-                      disabled={!activeChapter}
-                      value={newLog.topicId || ''}
-                      onChange={e => setNewLog({ ...newLog, topicId: e.target.value, subTopicId: '' })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white disabled:bg-slate-50 disabled:text-slate-400"
-                    >
-                      <option value="">Select Topic...</option>
-                      {activeChapter?.topics?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
+                    <div className={`w-full max-h-32 overflow-y-auto px-3 py-2 border border-slate-300 rounded-lg outline-none ${!activeChapter ? 'bg-slate-50' : 'bg-white'}`}>
+                      {!activeChapter ? (
+                        <div className="text-sm text-slate-400">Select a chapter first</div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {activeChapter?.topics?.map((t: any) => (
+                            <label key={t.id} className="flex items-center gap-2 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={Array.isArray(newLog.topicId) ? newLog.topicId.includes(t.id) : newLog.topicId === t.id}
+                                onChange={(e) => {
+                                  const current = Array.isArray(newLog.topicId) ? newLog.topicId : (newLog.topicId ? [newLog.topicId] : []);
+                                  const next = e.target.checked ? [...current, t.id] : current.filter(id => id !== t.id);
+                                  setNewLog({ ...newLog, topicId: next, subTopicId: [] });
+                                }}
+                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                              />
+                              <span className="text-sm text-slate-700 group-hover:text-slate-900">{t.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1.5">Sub-topic (Optional)</label>
-                    <select
-                      disabled={!activeTopic || !activeTopic.subTopics?.length}
-                      value={newLog.subTopicId || ''}
-                      onChange={e => setNewLog({ ...newLog, subTopicId: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white disabled:bg-slate-50 disabled:text-slate-400"
-                    >
-                      <option value="">Select Sub-topic...</option>
-                      {activeTopic?.subTopics?.map((st: any) => <option key={st.id} value={st.id}>{st.name}</option>)}
-                    </select>
+                    <div className={`w-full max-h-32 overflow-y-auto px-3 py-2 border border-slate-300 rounded-lg outline-none ${activeTopics.length === 0 ? 'bg-slate-50' : 'bg-white'}`}>
+                      {activeTopics.length === 0 ? (
+                        <div className="text-sm text-slate-400">Select a topic first</div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {activeTopics.flatMap((t: any) => t.subTopics || []).map((st: any) => (
+                            <label key={st.id} className="flex items-center gap-2 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={Array.isArray(newLog.subTopicId) ? newLog.subTopicId.includes(st.id) : newLog.subTopicId === st.id}
+                                onChange={(e) => {
+                                  const current = Array.isArray(newLog.subTopicId) ? newLog.subTopicId : (newLog.subTopicId ? [newLog.subTopicId] : []);
+                                  const next = e.target.checked ? [...current, st.id] : current.filter(id => id !== st.id);
+                                  setNewLog({ ...newLog, subTopicId: next });
+                                }}
+                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                              />
+                              <span className="text-sm text-slate-700 group-hover:text-slate-900">{st.name}</span>
+                            </label>
+                          ))}
+                          {activeTopics.flatMap((t: any) => t.subTopics || []).length === 0 && (
+                            <div className="text-sm text-slate-400">No sub-topics available</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
                   <div>

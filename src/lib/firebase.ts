@@ -3,13 +3,15 @@ import { initializeAuth, getAuth, signInWithEmailAndPassword, createUserWithEmai
 import { getFirestore } from "firebase/firestore";
 
 // Custom Firebase project configuration
+const env = typeof process !== 'undefined' && process.env ? process.env : (import.meta as any).env || {};
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD4hjE7UhFfzpBh63XzPwRY9gOhCQfUn8w",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "dugu-edutrack.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "dugu-edutrack",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "dugu-edutrack.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "336963361004",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:336963361004:web:4cde59e43fee0ad3282dc9"
+  apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyD4hjE7UhFfzpBh63XzPwRY9gOhCQfUn8w",
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "dugu-edutrack.firebaseapp.com",
+  projectId: env.VITE_FIREBASE_PROJECT_ID || "dugu-edutrack",
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "dugu-edutrack.firebasestorage.app",
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || "336963361004",
+  appId: env.VITE_FIREBASE_APP_ID || "1:336963361004:web:4cde59e43fee0ad3282dc9"
 };
 
 // Primary App for normal usage
