@@ -123,6 +123,7 @@ export default function ManageUsers() {
     if (confirm('Are you sure you want to remove this user? They will lose access to their role.')) {
       try {
         await deleteDoc(doc(db, 'users', user._docId || user.email));
+        alert("User successfully deleted from the app.");
       } catch (error) {
         console.error("Error deleting user:", error);
         alert("Failed to delete user.");

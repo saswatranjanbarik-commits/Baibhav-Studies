@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Target, Plus, X, Search, Filter, Layers, CheckCircle2, ChevronRight, ChevronLeft, Trash2, Upload, Download } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 
 type ItemType = 'flashcard' | 'quiz';
 
@@ -24,6 +25,7 @@ interface LearningItem {
 
 export default function Flashcards() {
   const { currentUser } = useAuth();
+  const [searchParams] = useSearchParams();
   const isStudent = currentUser?.role === 'Student';
   const [activeTab, setActiveTab] = useState<'manage' | 'flashcards' | 'quiz'>(isStudent ? 'flashcards' : 'manage');
   const [items, setItems] = useState<LearningItem[]>([]);
@@ -40,6 +42,8 @@ export default function Flashcards() {
   const [bulkError, setBulkError] = useState('');
 
   // Practice/Quiz state
+  const [practiceSubjectId, setPracticeSubjectId] = useState('');
+  const [practiceChapterId, setPracticeChapterId] = useState('');
   const [practiceSession, setPracticeSession] = useState<{
     items: LearningItem[];
     currentIndex: number;
@@ -198,7 +202,13 @@ export default function Flashcards() {
   };
 
   const startSession = (type: ItemType) => {
-    const sessionItems = items.filter(i => i.type === type);
+    let sessionItems = items.filter(i => i.type === type);
+    if (practiceSubjectId) {
+      sessionItems = sessionItems.filter(i => i.subjectId === practiceSubjectId);
+    }
+    if (practiceChapterId) {
+      sessionItems = sessionItems.filter(i => i.chapterId === practiceChapterId);
+    }
     // In a real app, we might filter by subject/chapter here if requested
     // Shuffle the items for practice
     const shuffled = [...sessionItems].sort(() => 0.5 - Math.random());
@@ -437,15 +447,39 @@ export default function Flashcards() {
                 ? 'Test your memory by flipping cards. Great for quick reviews.' 
                 : 'Take a multiple choice quiz to thoroughly test your knowledge.'}
             </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 mb-6 w-full max-w-lg">
+              <select
+                value={practiceSubjectId}
+                onChange={e => { setPracticeSubjectId(e.target.value); setPracticeChapterId(''); }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+              >
+                <option value="">All Subjects</option>
+                {syllabus.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              
+              <select
+                value={practiceChapterId}
+                onChange={e => setPracticeChapterId(e.target.value)}
+                disabled={!practiceSubjectId}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white disabled:bg-slate-50 disabled:text-slate-400"
+              >
+                <option value="">All Chapters</option>
+                {practiceSubjectId && syllabus.find(s => s.id === practiceSubjectId)?.chapters?.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
             <button
               onClick={() => startSession(activeTab === 'flashcards' ? 'flashcard' : 'quiz')}
-              disabled={items.filter(i => i.type === (activeTab === 'flashcards' ? 'flashcard' : 'quiz')).length === 0}
+              disabled={items.filter(i => i.type === (activeTab === 'flashcards' ? 'flashcard' : 'quiz') && (!practiceSubjectId || i.subjectId === practiceSubjectId) && (!practiceChapterId || i.chapterId === practiceChapterId)).length === 0}
               className="px-6 py-3 bg-red-600 text-white font-bold rounded-xl shadow-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Start {activeTab === 'flashcards' ? 'Practice' : 'Quiz'} Now
             </button>
-            {items.filter(i => i.type === (activeTab === 'flashcards' ? 'flashcard' : 'quiz')).length === 0 && (
-              <p className="text-sm text-red-500 mt-3 font-medium">No items available. Add some in Manage Content first.</p>
+            {items.filter(i => i.type === (activeTab === 'flashcards' ? 'flashcard' : 'quiz') && (!practiceSubjectId || i.subjectId === practiceSubjectId) && (!practiceChapterId || i.chapterId === practiceChapterId)).length === 0 && (
+              <p className="text-sm text-red-500 mt-3 font-medium">No items available for this selection.</p>
             )}
           </div>
         )}

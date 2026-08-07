@@ -1,15 +1,18 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, deleteDoc, doc } from "firebase/firestore";
-import fs from "fs";
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 
-const config = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
-const app = initializeApp(config);
-const db = config.firestoreDatabaseId ? getFirestore(app, config.firestoreDatabaseId) : getFirestore(app);
+const firebaseConfig = {
+  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyD4hjE7UhFfzpBh63XzPwRY9gOhCQfUn8w",
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID || "dugu-edutrack",
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 async function run() {
-  const querySnapshot = await getDocs(collection(db, "users"));
-  querySnapshot.forEach((doc) => {
-    console.log(`${doc.id} =>`, doc.data());
+  const q = collection(db, 'users');
+  const snapshot = await getDocs(q);
+  snapshot.forEach(doc => {
+    console.log(doc.id, doc.data());
   });
 }
 run();

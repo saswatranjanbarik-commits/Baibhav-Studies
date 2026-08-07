@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2, Download, Layers, Clock } from 'lucide-react';
+import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2, Download, Layers, Clock, PlayCircle } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
 interface SubTopic {
@@ -43,6 +43,7 @@ export default function Syllabus() {
   const { currentUser } = useAuth();
   const isStudent = currentUser?.role === 'Student';
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [learningItems, setLearningItems] = useState<any[]>([]);
   const [activeSubjectId, setActiveSubjectId] = useState<string>('');
   
   const [showAddSubject, setShowAddSubject] = useState(false);
@@ -90,6 +91,8 @@ export default function Syllabus() {
   };
 
   useEffect(() => {
+    const savedItems = localStorage.getItem('dugu_learning_items');
+    if (savedItems) setLearningItems(JSON.parse(savedItems));
     const saved = localStorage.getItem('dugu_syllabus_v2');
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -480,11 +483,33 @@ export default function Syllabus() {
 
                   {expandedNodes[chapter.id] && (
                     <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2">
-                      <div className="pl-6 mb-3">
-                        <Link to="/flashcards" className="inline-flex items-center gap-1.5 text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md transition-colors">
-                          <Layers className="h-3.5 w-3.5" />
-                          Flashcards & Quizzes for this Chapter
-                        </Link>
+                      <div className="pl-6 mb-3 flex flex-col gap-2">
+                        {(() => {
+                          const fcCount = learningItems.filter(i => i.chapterId === chapter.id && i.type === 'flashcard').length;
+                          const quizCount = learningItems.filter(i => i.chapterId === chapter.id && i.type === 'quiz').length;
+                          return (
+                            <div className="flex gap-2">
+                              {fcCount > 0 && (
+                                <Link to={`/flashcards?subjectId=${activeSubject.id}&chapterId=${chapter.id}&action=play-flashcard`} className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-md transition-colors shadow-sm">
+                                  <PlayCircle className="h-4 w-4" />
+                                  Practice {fcCount} Flashcards
+                                </Link>
+                              )}
+                              {quizCount > 0 && (
+                                <Link to={`/flashcards?subjectId=${activeSubject.id}&chapterId=${chapter.id}&action=play-quiz`} className="inline-flex items-center gap-1.5 text-xs font-bold text-red-700 hover:bg-red-100 bg-red-50 border border-red-200 px-3 py-1.5 rounded-md transition-colors shadow-sm">
+                                  <PlayCircle className="h-4 w-4" />
+                                  Take {quizCount}-Q Quiz
+                                </Link>
+                              )}
+                              {fcCount === 0 && quizCount === 0 && (
+                                <Link to="/flashcards" className="inline-flex items-center gap-1.5 text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md transition-colors">
+                                  <Layers className="h-3.5 w-3.5" />
+                                  Manage Flashcards & Quizzes
+                                </Link>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                       {!chapter.topics.length && <p className="text-xs text-slate-400 italic pl-6">No topics added.</p>}
                       {chapter.topics.map(topic => (
