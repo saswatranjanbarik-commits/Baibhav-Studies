@@ -21,10 +21,12 @@ interface DailyLogEntry {
   chapterId?: string;
   chapterName?: string;
   topicId?: string | string[];
-  topicName?: string | string[];
+  topicName?: string;
   subTopicId?: string | string[];
-  subTopicName?: string | string[];
+  subTopicName?: string;
   status?: 'In Progress' | 'Completed' | 'Have Doubt';
+  
+  classStatus?: 'Teacher Absent' | 'Rescheduled' | 'Canceled' | 'Attended';
   
   // Sand / Pebble
   activityDetail?: string;
@@ -119,8 +121,8 @@ export default function DailyLog() {
         type,
         subjectName: log.subjectName || '',
         chapterName: log.chapterName || '',
-        topicName: log.topicName || '',
-        subTopicName: log.subTopicName,
+        topicName: Array.isArray(log.topicName) ? log.topicName.join(', ') : log.topicName || '',
+        subTopicName: Array.isArray(log.subTopicName) ? log.subTopicName.join(', ') : log.subTopicName,
         status: 'Pending'
       };
     };
@@ -172,6 +174,7 @@ export default function DailyLog() {
       timeFrom: newLog.timeFrom,
       timeTo: newLog.timeTo,
       period: newLog.period,
+      classStatus: newLog.classStatus,
       notes: newLog.notes || ''
     };
 
@@ -184,10 +187,15 @@ export default function DailyLog() {
     }
 
     if (log.category === 'Rock') {
-      if (!newLog.subjectId || !newLog.chapterId) {
-        alert("Please select Subject and Chapter");
-        return;
+      const isAbsent = (log.logType === 'School' || log.logType === 'Tutor') && log.classStatus && log.classStatus !== 'Attended';
+      
+      if (!isAbsent) {
+        if (!newLog.subjectId || !newLog.chapterId) {
+          alert("Please select Subject and Chapter");
+          return;
+        }
       }
+      
       log.subjectId = newLog.subjectId;
       log.subjectName = activeSubject?.name || '';
       log.chapterId = newLog.chapterId;
@@ -431,7 +439,9 @@ export default function DailyLog() {
                         </div>
                       </td>
                       <td className="p-4 max-w-[300px]">
-                        {log.category === 'Rock' || !log.category ? (
+                        {log.classStatus && log.classStatus !== 'Attended' ? (
+                          <div className="font-bold text-red-600 text-sm">{log.classStatus}</div>
+                        ) : log.category === 'Rock' || !log.category ? (
                           <>
                             <div className="font-bold text-slate-800 text-sm">{log.subjectName} &middot; {log.chapterName}</div>
                             <div className="text-xs text-slate-600 mt-1">{log.topicName} {log.subTopicName && `> ${log.subTopicName}`}</div>
@@ -445,7 +455,7 @@ export default function DailyLog() {
                         )}
                       </td>
                       <td className="p-4 text-center">
-                        {(log.category === 'Rock' || !log.category) ? (
+                        {(log.category === 'Rock' || !log.category) && (!log.classStatus || log.classStatus === 'Attended') ? (
                           <button 
                             onClick={() => toggleStatus(log.id)}
                             className="focus:outline-none"
@@ -626,7 +636,25 @@ export default function DailyLog() {
               )}
 
               {/* Conditional Fields */}
-              {(newLog.category === 'Rock') && (
+              {(newLog.logType === 'School' || newLog.logType === 'Tutor') && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 pb-6 border-b border-slate-100">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Class Status</label>
+                    <select
+                      value={newLog.classStatus || 'Attended'}
+                      onChange={e => setNewLog({ ...newLog, classStatus: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="Attended">Attended</option>
+                      <option value="Teacher Absent">Teacher Absent</option>
+                      <option value="Rescheduled">Rescheduled</option>
+                      <option value="Canceled">Canceled</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {(newLog.category === 'Rock') && (!newLog.classStatus || newLog.classStatus === 'Attended') && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 pb-6 border-b border-slate-100">
                   <div className="sm:col-span-2">
                     <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Topic Taught / Studied</h4>
