@@ -25,18 +25,19 @@ interface Subject {
   id: string;
   name: string;
   chapters: Chapter[];
+  category?: 'Main' | 'Pebble';
 }
 
 const DEFAULT_SUBJECTS: Subject[] = [
-  { id: '1', name: 'English', chapters: [] },
-  { id: '2', name: 'Hindi', chapters: [] },
-  { id: '3', name: 'Odia', chapters: [] },
-  { id: '4', name: 'Mathematics', chapters: [] },
-  { id: '5', name: 'Science', chapters: [] },
-  { id: '6', name: 'Social Studies', chapters: [] },
-  { id: '7', name: 'Computer Science', chapters: [] },
-  { id: '8', name: 'Moral Science', chapters: [] },
-  { id: '9', name: 'General Knowledge', chapters: [] },
+  { id: '1', name: 'English', chapters: [], category: 'Main' },
+  { id: '2', name: 'Hindi', chapters: [], category: 'Main' },
+  { id: '3', name: 'Odia', chapters: [], category: 'Main' },
+  { id: '4', name: 'Mathematics', chapters: [], category: 'Main' },
+  { id: '5', name: 'Science', chapters: [], category: 'Main' },
+  { id: '6', name: 'Social Studies', chapters: [], category: 'Main' },
+  { id: '7', name: 'Computer Science', chapters: [], category: 'Pebble' },
+  { id: '8', name: 'Moral Science', chapters: [], category: 'Pebble' },
+  { id: '9', name: 'General Knowledge', chapters: [], category: 'Pebble' },
 ];
 
 export default function Syllabus() {
@@ -48,6 +49,7 @@ export default function Syllabus() {
   
   const [showAddSubject, setShowAddSubject] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
+  const [newSubjectCategory, setNewSubjectCategory] = useState<'Main'|'Pebble'>('Main');
 
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
 
@@ -121,10 +123,11 @@ export default function Syllabus() {
     e.preventDefault();
     if (!newSubjectName.trim()) return;
     const newId = Date.now().toString();
-    const newSubs = [...subjects, { id: newId, name: newSubjectName, chapters: [] }];
+    const newSubs = [...subjects, { id: newId, name: newSubjectName, chapters: [], category: newSubjectCategory }];
     saveSubjects(newSubs);
     setActiveSubjectId(newId);
     setNewSubjectName('');
+    setNewSubjectCategory('Main');
     setShowAddSubject(false);
   };
 
@@ -411,22 +414,49 @@ export default function Syllabus() {
       )}
 
       {/* Subject Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide">
-        {subjects.map(s => (
-          <button
-            key={s.id}
-            onClick={() => setActiveSubjectId(s.id)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
-              activeSubjectId === s.id 
-                ? "bg-indigo-600 text-white shadow-sm" 
-                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            {s.name}
-          </button>
-        ))}
+      <div className="mb-6 space-y-4">
+        {subjects.some(s => s.category !== 'Pebble') && (
+          <div>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Main Subjects</h4>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {subjects.filter(s => s.category !== 'Pebble').map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setActiveSubjectId(s.id)}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
+                    activeSubjectId === s.id 
+                      ? "bg-indigo-600 text-white shadow-sm" 
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {subjects.some(s => s.category === 'Pebble') && (
+          <div>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> Pebble Subjects</h4>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {subjects.filter(s => s.category === 'Pebble').map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setActiveSubjectId(s.id)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                    activeSubjectId === s.id 
+                      ? "bg-teal-600 text-white shadow-sm" 
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm min-h-[500px]">
         {/* Active Subject Header */}
         <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 rounded-t-xl">
@@ -629,7 +659,21 @@ export default function Syllabus() {
                   placeholder="Enter subject name..."
                 />
               </div>
+              <div className="mt-4">
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Category</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="category" value="Main" checked={newSubjectCategory === 'Main'} onChange={() => setNewSubjectCategory('Main')} className="text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm text-slate-700">Main Subject</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="category" value="Pebble" checked={newSubjectCategory === 'Pebble'} onChange={() => setNewSubjectCategory('Pebble')} className="text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm text-slate-700">Pebble (Extra)</span>
+                  </label>
+                </div>
+              </div>
               <div className="mt-6 flex justify-end gap-3">
+
                 <button
                   type="button"
                   onClick={() => setShowAddSubject(false)}
