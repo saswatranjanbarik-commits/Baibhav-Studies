@@ -156,7 +156,7 @@ export default function DailyLog() {
         topicId: planItem.topicId,
         subTopicId: planItem.subTopicId || '',
         logType: 'Self Study',
-        category: 'Rock'
+        category: syllabus.find(s => s.id === planItem.subjectId)?.category || 'Rock'
       }));
     }
   };
@@ -164,7 +164,11 @@ export default function DailyLog() {
   const handleLogTypeChange = (type: LogType) => {
     let category: Category = 'Rock';
     if (type === 'Play') category = 'Sand';
-    if (type === 'Activity') category = 'Pebble';
+    else if (type === 'Activity') category = 'Pebble';
+    else if (newLog.subjectId) {
+      const activeSubject = syllabus.find(s => s.id === newLog.subjectId);
+      category = activeSubject?.category || 'Rock';
+    }
     setNewLog(prev => ({ ...prev, logType: type, category, activityDetail: '' }));
   };
 
@@ -467,8 +471,15 @@ export default function DailyLog() {
                           >
                             {log.status === 'Completed' ? (
                               <CheckCircle className="h-6 w-6 text-green-500 mx-auto" />
+                            ) : log.status === 'In Progress' ? (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-amber-500 mx-auto hover:text-indigo-400 transition-colors">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor" />
+                              </svg>
                             ) : (
-                              <div className="h-6 w-6 rounded-full border-2 border-slate-300 mx-auto hover:border-indigo-400 transition-colors"></div>
+                              <div className="h-6 w-6 rounded-full border-2 border-slate-300 mx-auto hover:border-indigo-400 transition-colors flex items-center justify-center">
+                                {log.status === 'Have Doubt' && <span className="text-[10px] font-bold text-slate-400">?</span>}
+                              </div>
                             )}
                             <div className="text-[10px] font-semibold text-slate-500 mt-1">{log.status}</div>
                           </button>
@@ -522,9 +533,10 @@ export default function DailyLog() {
                       <button
                         onClick={() => {
                           const { timeFrom, timeTo } = getPeriodTimes(t.period);
+                          const currentSub = syllabus.find(s => s.id === t.subjectId);
                           setNewLog({
                             logType: 'School',
-                            category: 'Rock',
+                            category: currentSub?.category || 'Rock',
                             date: activeDate,
                             period: t.period,
                             timeFrom,
@@ -688,7 +700,10 @@ export default function DailyLog() {
                     <select
                       required
                       value={newLog.subjectId || ''}
-                      onChange={e => setNewLog({ ...newLog, subjectId: e.target.value, chapterId: '', topicId: [], subTopicId: [] })}
+                      onChange={e => {
+                        const newSub = syllabus.find(s => s.id === e.target.value);
+                        setNewLog({ ...newLog, subjectId: e.target.value, chapterId: '', topicId: [], subTopicId: [], category: newSub?.category || 'Rock' });
+                      }}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                     >
                       <option value="">Select Subject...</option>

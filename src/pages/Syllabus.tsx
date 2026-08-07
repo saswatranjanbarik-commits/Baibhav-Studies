@@ -91,7 +91,7 @@ export default function Syllabus() {
 
   const StatusBadge = ({ status }: { status: string }) => {
     if (status === 'Completed') return <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Completed</span>;
-    if (status === 'In Progress') return <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">In Progress</span>;
+    if (status === 'In Progress') return <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><circle cx="12" cy="12" r="10" /><path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor" /></svg> In Progress</span>;
     return <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">Pending</span>;
   };
 

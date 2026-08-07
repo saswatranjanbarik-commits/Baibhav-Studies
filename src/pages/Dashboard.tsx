@@ -96,6 +96,7 @@ export default function Dashboard() {
             const pct = displayTotal > 0 ? Math.round((completedInSub / displayTotal) * 100) : 0;
             
             return {
+              id: sub.id,
               name: sub.name,
               progress: completedInSub,
               total: displayTotal,
@@ -236,9 +237,32 @@ export default function Dashboard() {
           <div className="text-3xl font-black text-orange-600">{revisionsDue}</div>
           <div className="text-xs text-slate-500 font-medium mt-1">Revisions Due</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-teal-700">
-          <div className="text-3xl font-black text-teal-700">{overallProgress}%</div>
-          <div className="text-xs text-slate-500 font-medium mt-1">Overall Progress</div>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-teal-700 flex flex-col items-center justify-center relative">
+          <div className="text-xs text-slate-500 font-medium absolute top-4 left-4">Overall Progress</div>
+          <div className="relative w-24 h-12 overflow-hidden mt-6">
+            <svg className="absolute top-0 left-0 w-24 h-24" viewBox="0 0 100 100">
+              <path
+                d="M 10,50 a 40,40 0 0,1 80,0"
+                fill="none"
+                stroke="#e2e8f0"
+                strokeWidth="10"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 10,50 a 40,40 0 0,1 80,0"
+                fill="none"
+                stroke="#0f766e"
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeDasharray="125.66"
+                strokeDashoffset={125.66 - (overallProgress / 100) * 125.66}
+                className="transition-all duration-1000 ease-out"
+              />
+            </svg>
+            <div className="absolute bottom-0 w-full text-center text-xl font-black text-teal-700 leading-none">
+              {overallProgress}%
+            </div>
+          </div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-purple-600">
           <div className="text-3xl font-black text-purple-600">{pendingTasks}</div>
@@ -275,8 +299,8 @@ export default function Dashboard() {
             {subjectProgress.length === 0 ? (
                <div className="text-center py-6 text-slate-500 text-sm">No subjects found in syllabus.</div>
             ) : (
-              subjectProgress.map((sub: any) => (
-                <div key={sub.name}>
+              subjectProgress.map((sub: any, idx: number) => (
+                <div key={sub.id || sub.name + idx}>
                   <div className="flex justify-between text-xs mb-1.5">
                     <span className="font-bold text-slate-700">{sub.name}</span>
                     <span className="text-slate-500">{sub.progress}/{sub.total} &middot; {sub.pct}%</span>

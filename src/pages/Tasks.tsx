@@ -141,7 +141,11 @@ export default function Tasks() {
   const toggleTaskStatus = (task: Task) => {
     const updatedTasks = tasks.map(t => {
       if (t.id === task.id) {
-        return { ...t, status: t.status === 'Completed' ? 'Pending' : 'Completed' };
+        let nextStatus: 'Pending' | 'In Progress' | 'Completed' = 'Pending';
+        if (t.status === 'Pending') nextStatus = 'In Progress';
+        else if (t.status === 'In Progress') nextStatus = 'Completed';
+        else nextStatus = 'Pending';
+        return { ...t, status: nextStatus };
       }
       return t;
     });
@@ -302,6 +306,11 @@ export default function Tasks() {
                             >
                               {task.status === 'Completed' ? (
                                 <CheckCircle2 className="h-5 w-5 text-green-500" />
+                              ) : task.status === 'In Progress' ? (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-amber-500">
+                                  <circle cx="12" cy="12" r="10" />
+                                  <path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor" />
+                                </svg>
                               ) : (
                                 <Circle className="h-5 w-5" />
                               )}
