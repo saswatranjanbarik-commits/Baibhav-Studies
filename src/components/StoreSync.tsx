@@ -9,6 +9,8 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
   
   // Keep track of what the cloud told us last, so we can detect stale overwrites vs deliberate deletions
   const lastKnownCloudData = useRef<Record<string, any>>({});
+  // Track if we've done our initial upload
+  const initialUploadDone = useRef<boolean>(false);
 
   useEffect(() => {
     let originalSetItem = window.localStorage.setItem;
@@ -31,6 +33,68 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
       
       // Update our reference of what the cloud state is
       lastKnownCloudData.current = JSON.parse(JSON.stringify(data));
+      
+      // MIGRATION: Push existing local data to cloud on first load
+      if (!initialUploadDone.current) {
+        let needsCloudUpload = false;
+        const localUploads: Record<string, any> = {};
+        
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith('dugu_')) {
+            const localValue = window.localStorage.getItem(key);
+            if (localValue) {
+              try {
+                const parsedLocal = JSON.parse(localValue);
+                const cloudValue = data[key];
+                
+                if (cloudValue === undefined) {
+                  localUploads[key] = parsedLocal;
+                  needsCloudUpload = true;
+                  data[key] = parsedLocal; // Use it locally immediately
+                } else if (Array.isArray(parsedLocal) && Array.isArray(cloudValue)) {
+                  // If both are arrays, merge missing local items into cloud array
+                  const isObjectArray = (parsedLocal.length > 0 && typeof parsedLocal[0] === 'object' && parsedLocal[0] !== null && 'id' in parsedLocal[0]) || 
+                                        (cloudValue.length > 0 && typeof cloudValue[0] === 'object' && cloudValue[0] !== null && 'id' in cloudValue[0]);
+                  
+                  if (isObjectArray) {
+                    const cloudMap = new Map();
+                    cloudValue.forEach((item: any) => { if (item && item.id) cloudMap.set(item.id, item); });
+                    
+                    let merged = false;
+                    parsedLocal.forEach((item: any) => {
+                      if (item && item.id && !cloudMap.has(item.id)) {
+                        cloudMap.set(item.id, item);
+                        merged = true;
+                      }
+                    });
+                    
+                    if (merged) {
+                      localUploads[key] = Array.from(cloudMap.values());
+                      needsCloudUpload = true;
+                      data[key] = localUploads[key];
+                    }
+                  } else {
+                    // Primitive array merge
+                    const combined = Array.from(new Set([...cloudValue, ...parsedLocal]));
+                    if (combined.length > cloudValue.length) {
+                      localUploads[key] = combined;
+                      needsCloudUpload = true;
+                      data[key] = combined;
+                    }
+                  }
+                }
+              } catch(e) {}
+            }
+          }
+        }
+        
+        if (needsCloudUpload) {
+          console.log("Uploading local data to cloud...", Object.keys(localUploads));
+          setDoc(storeRef, localUploads, { merge: true }).catch(console.error);
+        }
+        initialUploadDone.current = true;
+      }
       
       // Populate local storage with cloud data
       let changed = false;
