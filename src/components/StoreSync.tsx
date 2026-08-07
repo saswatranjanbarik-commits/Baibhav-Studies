@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
 
 export default function StoreSync({ children }: { children: React.ReactNode }) {
@@ -81,13 +81,48 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
       if (!currentUser) return; // Only sync if logged in
       
       try {
-        let parsedValue = value;
+        let parsedValue: any = value;
         try {
           parsedValue = JSON.parse(value);
         } catch(e) {}
         
-        setDoc(storeRef, { [key]: parsedValue }, { merge: true })
-          .catch(e => console.error("Cloud sync error for setItem:", e));
+        // Use a transaction to safely merge arrays and objects
+        runTransaction(db, async (transaction) => {
+          const docSnap = await transaction.get(storeRef);
+          const currentData = docSnap.exists() ? docSnap.data() : {};
+          const existingValue = currentData[key];
+          
+          let mergedValue: any = parsedValue;
+          
+          if (existingValue !== undefined) {
+            if (Array.isArray(existingValue) && Array.isArray(parsedValue)) {
+              const isObjectArray = (parsedValue.length > 0 && typeof parsedValue[0] === 'object' && parsedValue[0] !== null && 'id' in parsedValue[0]) ||
+                                    (existingValue.length > 0 && typeof existingValue[0] === 'object' && existingValue[0] !== null && 'id' in existingValue[0]);
+              
+              if (isObjectArray) {
+                if (parsedValue.length < existingValue.length) {
+                  // Assume deletion, trust the new array
+                  mergedValue = parsedValue;
+                } else {
+                  const map = new Map();
+                  existingValue.forEach((item: any) =>item => {
+                    if (item && item.id) map.set(item.id, item);
+                  });
+                  parsedValue.forEach((item: any) =>item => {
+                    if (item && item.id) map.set(item.id, item);
+                  });
+                  mergedValue = Array.from(map.values());
+                }
+              } else {
+                mergedValue = Array.from(new Set([...existingValue, ...parsedValue]));
+              }
+            } else if (typeof existingValue === 'object' && existingValue !== null && typeof parsedValue === 'object' && parsedValue !== null) {
+              mergedValue = { ...existingValue, ...parsedValue };
+            }
+          }
+          
+          transaction.set(storeRef, { [key]: mergedValue }, { merge: true });
+        }).catch(e => console.error("Cloud sync transaction error for setItem:", e));
       } catch (e) {
         console.error(e);
       }
@@ -95,6 +130,9 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
 
     return () => {
       unsubscribe();
+      
+      
+
       window.localStorage.setItem = originalSetItem;
       window.localStorage.removeItem = originalRemoveItem;
       window.localStorage.clear = originalClear;
