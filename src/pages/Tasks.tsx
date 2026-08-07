@@ -46,11 +46,16 @@ export default function Tasks() {
   });
 
   useEffect(() => {
+    const load = () => {
     const savedTasks = localStorage.getItem('dugu_tasks');
     if (savedTasks) setTasks(JSON.parse(savedTasks));
 
     const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveTasks = (newTasks: Task[]) => {

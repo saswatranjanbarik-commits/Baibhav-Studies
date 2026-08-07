@@ -91,6 +91,7 @@ export default function Syllabus() {
   };
 
   useEffect(() => {
+    const load = () => {
     const savedItems = localStorage.getItem('dugu_learning_items');
     if (savedItems) setLearningItems(JSON.parse(savedItems));
     const saved = localStorage.getItem('dugu_syllabus_v2');
@@ -105,6 +106,10 @@ export default function Syllabus() {
 
     const savedLogs = localStorage.getItem('dugu_daily_logs');
     if (savedLogs) setDailyLogs(JSON.parse(savedLogs));
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveSubjects = (newSubjects: Subject[]) => {

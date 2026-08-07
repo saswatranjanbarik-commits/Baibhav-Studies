@@ -33,11 +33,16 @@ export default function StudyNotes() {
   });
 
   useEffect(() => {
+    const load = () => {
     const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
 
     const savedNotes = localStorage.getItem('dugu_study_notes');
     if (savedNotes) setNotes(JSON.parse(savedNotes));
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveNotes = (newNotes: StudyNote[]) => {

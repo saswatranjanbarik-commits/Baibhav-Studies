@@ -17,6 +17,7 @@ export default function Revisions() {
   const [revisions, setRevisions] = useState<RevisionEntry[]>([]);
 
   useEffect(() => {
+    const load = () => {
     const saved = localStorage.getItem('dugu_revisions');
     if (saved) {
       // Sort by scheduled date ascending
@@ -24,6 +25,10 @@ export default function Revisions() {
       parsed.sort((a, b) => new Date(a.dateScheduled).getTime() - new Date(b.dateScheduled).getTime());
       setRevisions(parsed);
     }
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const markCompleted = (id: string) => {

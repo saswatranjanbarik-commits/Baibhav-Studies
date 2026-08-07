@@ -23,8 +23,13 @@ export default function Appreciation() {
   });
 
   useEffect(() => {
+    const load = () => {
     const saved = localStorage.getItem('dugu_appreciation');
     if (saved) setRecords(JSON.parse(saved));
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveRecords = (newRecords: AppreciationRecord[]) => {

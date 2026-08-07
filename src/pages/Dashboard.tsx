@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [subjectProgress, setSubjectProgress] = React.useState<any[]>([]);
 
   React.useEffect(() => {
+    const load = () => {
     // Basic local load first
     const loadFromLocal = () => {
       // 1. Load points
@@ -112,6 +113,10 @@ export default function Dashboard() {
     };
 
     fetchSyncData();
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveEvent = (e: React.FormEvent) => {

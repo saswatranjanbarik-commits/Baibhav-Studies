@@ -37,11 +37,16 @@ export default function StudyPlan() {
   });
 
   useEffect(() => {
+    const load = () => {
     const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
 
     const savedEntries = localStorage.getItem('dugu_study_plan');
     if (savedEntries) setEntries(JSON.parse(savedEntries));
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveEntries = (newEntries: StudyPlanEntry[]) => {

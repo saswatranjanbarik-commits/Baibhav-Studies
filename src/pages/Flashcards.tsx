@@ -62,11 +62,16 @@ export default function Flashcards() {
   });
 
   useEffect(() => {
+    const load = () => {
     const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
 
     const savedItems = localStorage.getItem('dugu_learning_items');
     if (savedItems) setItems(JSON.parse(savedItems));
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveItems = (newItems: LearningItem[]) => {

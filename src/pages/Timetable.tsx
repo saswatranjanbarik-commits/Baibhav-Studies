@@ -20,6 +20,7 @@ export default function Timetable() {
   const periods = ['Period 1', 'Period 2', 'Period 3', 'Period 4', 'Period 5', 'Period 6', 'Period 7', 'Period 8'];
 
   useEffect(() => {
+    const load = () => {
     const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
 
@@ -27,6 +28,10 @@ export default function Timetable() {
     if (savedEntries) {
       setEntries(JSON.parse(savedEntries));
     }
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveEntries = (newEntries: TimetableEntry[]) => {

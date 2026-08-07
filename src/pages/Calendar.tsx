@@ -49,6 +49,7 @@ export default function Calendar() {
   });
 
   useEffect(() => {
+    const load = () => {
     // Local load first
     const savedEvents = localStorage.getItem('dugu_events');
     if (savedEvents) setEvents(JSON.parse(savedEvents));
@@ -77,6 +78,10 @@ export default function Calendar() {
       }
     };
     fetchSyncData();
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveEvents = async (newEvents: Event[]) => {

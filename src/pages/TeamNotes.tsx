@@ -25,10 +25,15 @@ export default function TeamNotes() {
   });
 
   useEffect(() => {
+    const load = () => {
     const savedNotes = localStorage.getItem('dugu_team_notes');
     if (savedNotes) {
       setNotes(JSON.parse(savedNotes));
     }
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveNotes = (updatedNotes: TeamNote[]) => {

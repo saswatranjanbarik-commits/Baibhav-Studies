@@ -68,6 +68,7 @@ export default function DailyLog() {
   const [activeDate, setActiveDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
+    const load = () => {
     const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
     if (savedSyllabus) setSyllabus(JSON.parse(savedSyllabus));
     const savedLogs = localStorage.getItem('dugu_daily_logs');
@@ -84,6 +85,10 @@ export default function DailyLog() {
       const users = JSON.parse(savedUsers);
       setTeachers(users.filter((u: any) => u.role === 'Teacher'));
     }
+      };
+    load();
+    window.addEventListener('cloud_sync_update', load);
+    return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const saveLogs = async (updater: (prev: DailyLogEntry[]) => DailyLogEntry[]) => {
