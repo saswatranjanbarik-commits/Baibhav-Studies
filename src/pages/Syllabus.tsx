@@ -103,10 +103,10 @@ export default function Syllabus() {
     if (saved) {
       const parsed = JSON.parse(saved);
       setSubjects(parsed);
-      if (parsed.length > 0) setActiveSubjectId(parsed[0].id);
+      setActiveSubjectId(curr => curr && parsed.find((s: any) => s.id === curr) ? curr : (parsed.length > 0 ? parsed[0].id : ''));
     } else {
       setSubjects(DEFAULT_SUBJECTS);
-      setActiveSubjectId(DEFAULT_SUBJECTS[0].id);
+      setActiveSubjectId(curr => curr && DEFAULT_SUBJECTS.find(s => s.id === curr) ? curr : DEFAULT_SUBJECTS[0].id);
     }
 
     const savedLogs = localStorage.getItem('dugu_daily_logs');

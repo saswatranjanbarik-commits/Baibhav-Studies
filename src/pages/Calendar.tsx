@@ -133,7 +133,7 @@ export default function Calendar() {
   const getEventsForDate = (dateStr: string) => {
     const dayEvents = events.filter(e => e.date === dateStr);
     const dayTasks = tasks.filter(t => t.dueDate === dateStr);
-    const dayLogs = dailyLogs.filter(l => l.date === dateStr);
+    const dayLogs = dailyLogs.filter(l => l.date === dateStr).sort((a, b) => (a.timeFrom || '').localeCompare(b.timeFrom || ''));
     return { dayEvents, dayTasks, dayLogs };
   };
 

@@ -266,7 +266,7 @@ export default function DailyLog() {
     }));
   };
 
-  const filteredLogs = logs.filter(l => l.date === activeDate);
+  const filteredLogs = logs.filter(l => l.date === activeDate).sort((a, b) => (a.timeFrom || '').localeCompare(b.timeFrom || ''));
 
   const activeDayOfWeek = new Date(activeDate).toLocaleDateString('en-US', { weekday: 'long' });
   const todaysTimetable = timetable.filter(t => t.day === activeDayOfWeek).sort((a,b) => a.period.localeCompare(b.period));

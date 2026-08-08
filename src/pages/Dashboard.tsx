@@ -1,5 +1,8 @@
 import React from 'react';
 import { useAuth } from '../lib/AuthContext';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useNavigate } from 'react-router-dom';
 import { BookOpen, Star, BarChart3, CheckCircle2, Clock, Calendar as CalendarIcon, RefreshCw, Trophy, Target, Sparkles, Globe2, Edit3, X } from 'lucide-react';
 
 export default function Dashboard() {
@@ -15,11 +18,15 @@ export default function Dashboard() {
   const [overallProgress, setOverallProgress] = React.useState(0);
   const [recentTopics, setRecentTopics] = React.useState<any[]>([]);
   const [subjectProgress, setSubjectProgress] = React.useState<any[]>([]);
+  const [teamUsers, setTeamUsers] = React.useState<any[]>([]);
+  const navigate = useNavigate();
 
   React.useEffect(() => {
     const load = () => {
     // Basic local load first
-    const loadFromLocal = () => {
+    const loadFromLocal = async () => {
+      try { const usersSnap = await getDocs(collection(db, 'users')); setTeamUsers(usersSnap.docs.map(d => d.data())); } catch (e) { console.error(e); }
+
       // 1. Load points
       const savedAppreciation = localStorage.getItem('dugu_appreciation');
       if (savedAppreciation) {
@@ -44,7 +51,7 @@ export default function Dashboard() {
       const savedTasks = localStorage.getItem('dugu_tasks');
       if (savedTasks) {
         const tasks = JSON.parse(savedTasks);
-        const pending = tasks.filter((t: any) => t.status === 'Pending');
+        const pending = tasks.filter((t: any) => t.status === 'Pending' || t.status === 'Overdue');
         setPendingTasks(pending.length);
       }
     };
@@ -60,7 +67,7 @@ export default function Dashboard() {
         }
 
         setTopicsLogged(logs.length);
-        setRecentTopics(logs.slice(0, 3));
+        setRecentTopics([...logs].sort((a,b) => new Date(b.date + 'T' + (b.timeFrom || '00:00')).getTime() - new Date(a.date + 'T' + (a.timeFrom || '00:00')).getTime()).slice(0, 3));
 
         const savedSyllabus = localStorage.getItem('dugu_syllabus_v2');
         const savedPlan = localStorage.getItem('dugu_study_plan');
@@ -246,12 +253,12 @@ export default function Dashboard() {
           <div className="text-2xl sm:text-3xl font-black text-indigo-600">{topicsLogged}</div>
         </div>
         
-        <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm border-t-4 border-t-orange-600 flex flex-col justify-between">
+        <div onClick={() => navigate("/revisions")} className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm border-t-4 border-t-orange-600 flex flex-col justify-between cursor-pointer hover:bg-orange-50 transition-colors">
           <div className="text-xs text-slate-500 font-medium mb-1">Revisions Due</div>
           <div className="text-2xl sm:text-3xl font-black text-orange-600">{revisionsDue}</div>
         </div>
         
-        <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm border-t-4 border-t-purple-600 flex flex-col justify-between">
+        <div onClick={() => navigate("/tasks")} className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm border-t-4 border-t-purple-600 flex flex-col justify-between cursor-pointer hover:bg-purple-50 transition-colors">
           <div className="text-xs text-slate-500 font-medium mb-1">Pending Tasks</div>
           <div className="text-2xl sm:text-3xl font-black text-purple-600">{pendingTasks}</div>
         </div>
@@ -290,20 +297,35 @@ export default function Dashboard() {
         <h3 className="text-[15px] font-bold text-slate-900 mb-3 flex items-center gap-2">
           <Globe2 className="h-4 w-4 text-blue-500" /> Team Online Now
         </h3>
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            <div>
-              <div className="text-sm font-bold text-slate-900">{currentUser?.username || 'User'}</div>
-              <div className="text-xs text-slate-500">{currentUser?.timezone || 'Timezone'}</div>
+        <div className="space-y-2 max-h-48 overflow-y-auto">
+          {teamUsers.length > 0 ? (
+            teamUsers.map((user: any, i: number) => (
+              <div key={user.id || i} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">{user.username || 'User'}</div>
+                    <div className="text-xs text-slate-500">{user.timezone || 'Timezone'}</div>
+                  </div>
+                </div>
+                <div className="text-[10px] font-bold text-indigo-600 px-2 py-1 bg-indigo-50 rounded">
+                  {user.role}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <div>
+                  <div className="text-sm font-bold text-slate-900">{currentUser?.username || 'User'}</div>
+                  <div className="text-xs text-slate-500">{currentUser?.timezone || 'Timezone'}</div>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="text-sm font-bold text-indigo-600">
-            {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-          </div>
+          )}
         </div>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Subject Progress */}
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
@@ -357,8 +379,8 @@ export default function Dashboard() {
                                 <div className="font-bold text-amber-700 text-xs">{sub.inProgress}</div>
                               </div>
                               <div className="bg-white rounded p-1 border border-slate-200">
-                                <div className={`${sub.color.replace('bg-', 'text-')} mb-0.5`}>Completed</div>
-                                <div className="font-bold text-slate-700 text-xs">{sub.progress}</div>
+                                <div className="text-green-600 mb-0.5">Completed</div>
+                                <div className="font-bold text-green-700 text-xs">{sub.progress}</div>
                               </div>
                             </div>
                           </div>
