@@ -87,8 +87,16 @@ export default function Dashboard() {
             const completedCount = Array.from(completedTopics).filter(id => id).length;
             const additionalCompleted = [...completedInPlan, ...completedInLogs].filter(id => !id).length;
             const completedInSub = completedCount + additionalCompleted;
+
+            const inProgressInPlan = plan.filter((p: any) => p.subjectId === sub.id && p.status === 'In Progress').map((p: any) => p.topicId);
+            const inProgressInLogs = logs.filter((l: any) => l.subjectId === sub.id && l.status === 'In Progress').map((l: any) => l.topicId);
+            const inProgressTopics = new Set([...inProgressInPlan, ...inProgressInLogs]);
+            const inProgressCount = Array.from(inProgressTopics).filter(id => id && !completedTopics.has(id)).length;
+            const additionalInProgress = [...inProgressInPlan, ...inProgressInLogs].filter(id => !id).length;
+            const inProgressInSub = inProgressCount + additionalInProgress;
             
             const displayTotal = Math.max(subTotalTopics, plan.filter((p: any) => p.subjectId === sub.id).length);
+            const notStartedInSub = Math.max(0, displayTotal - completedInSub - inProgressInSub);
             
             totalItems += displayTotal;
             completedItems += completedInSub;
@@ -98,7 +106,10 @@ export default function Dashboard() {
             return {
               id: sub.id,
               name: sub.name,
+              category: sub.category || 'Rock',
               progress: completedInSub,
+              inProgress: inProgressInSub,
+              notStarted: notStartedInSub,
               total: displayTotal,
               pct: pct,
               color: colors[idx % colors.length]
@@ -222,25 +233,33 @@ export default function Dashboard() {
       )}
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-yellow-500">
-          <div className="text-3xl font-black text-yellow-500 flex items-center gap-1">
-            {totalPoints} <Star className="h-5 w-5 fill-current" />
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm border-t-4 border-t-yellow-500 flex flex-col justify-between">
+          <div className="text-xs text-slate-500 font-medium mb-1">Total Points</div>
+          <div className="text-2xl sm:text-3xl font-black text-yellow-500 flex items-center gap-1">
+            {totalPoints} <Star className="h-4 w-4 sm:h-5 sm:w-5 fill-current" />
           </div>
-          <div className="text-xs text-slate-500 font-medium mt-1">Total Points</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-indigo-600">
-          <div className="text-3xl font-black text-indigo-600">{topicsLogged}</div>
-          <div className="text-xs text-slate-500 font-medium mt-1">Topics Logged</div>
+        
+        <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm border-t-4 border-t-indigo-600 flex flex-col justify-between">
+          <div className="text-xs text-slate-500 font-medium mb-1">Topics Logged</div>
+          <div className="text-2xl sm:text-3xl font-black text-indigo-600">{topicsLogged}</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-orange-600">
-          <div className="text-3xl font-black text-orange-600">{revisionsDue}</div>
-          <div className="text-xs text-slate-500 font-medium mt-1">Revisions Due</div>
+        
+        <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm border-t-4 border-t-orange-600 flex flex-col justify-between">
+          <div className="text-xs text-slate-500 font-medium mb-1">Revisions Due</div>
+          <div className="text-2xl sm:text-3xl font-black text-orange-600">{revisionsDue}</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-teal-700 flex flex-col items-center justify-center relative">
-          <div className="text-xs text-slate-500 font-medium absolute top-4 left-4">Overall Progress</div>
-          <div className="relative w-24 h-12 overflow-hidden mt-6">
-            <svg className="absolute top-0 left-0 w-24 h-24" viewBox="0 0 100 100">
+        
+        <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm border-t-4 border-t-purple-600 flex flex-col justify-between">
+          <div className="text-xs text-slate-500 font-medium mb-1">Pending Tasks</div>
+          <div className="text-2xl sm:text-3xl font-black text-purple-600">{pendingTasks}</div>
+        </div>
+        
+        <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm border-t-4 border-t-teal-700 flex flex-col justify-between col-span-2 lg:col-span-1 items-center relative overflow-hidden">
+          <div className="text-xs text-slate-500 font-medium self-start w-full text-left mb-2">Overall Progress</div>
+          <div className="relative w-20 h-10 mt-auto">
+            <svg className="absolute top-0 left-0 w-20 h-20" viewBox="0 0 100 100">
               <path
                 d="M 10,50 a 40,40 0 0,1 80,0"
                 fill="none"
@@ -259,14 +278,10 @@ export default function Dashboard() {
                 className="transition-all duration-1000 ease-out"
               />
             </svg>
-            <div className="absolute bottom-0 w-full text-center text-xl font-black text-teal-700 leading-none">
+            <div className="absolute bottom-0 w-full text-center text-lg font-black text-teal-700 leading-none">
               {overallProgress}%
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm border-t-4 border-t-purple-600">
-          <div className="text-3xl font-black text-purple-600">{pendingTasks}</div>
-          <div className="text-xs text-slate-500 font-medium mt-1">Pending Tasks</div>
         </div>
       </div>
 
@@ -299,20 +314,60 @@ export default function Dashboard() {
             {subjectProgress.length === 0 ? (
                <div className="text-center py-6 text-slate-500 text-sm">No subjects found in syllabus.</div>
             ) : (
-              subjectProgress.map((sub: any, idx: number) => (
-                <div key={sub.id || sub.name + idx}>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="font-bold text-slate-700">{sub.name}</span>
-                    <span className="text-slate-500">{sub.progress}/{sub.total} &middot; {sub.pct}%</span>
+              ['Rock', 'Pebble', 'Sand'].map(cat => {
+                const catSubjects = subjectProgress.filter((s: any) => s.category === cat);
+                if (catSubjects.length === 0) return null;
+                
+                return (
+                  <div key={cat} className="mb-6 last:mb-0">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-1 border-b border-slate-100 pb-2">{cat} Subjects</h4>
+                    <div className="space-y-3">
+                      {catSubjects.map((sub: any, idx: number) => {
+                        const total = sub.total || 1; // prevent div by zero
+                        const pctCompleted = (sub.progress / total) * 100;
+                        const pctInProgress = (sub.inProgress / total) * 100;
+                        
+                        return (
+                          <div key={sub.id || sub.name + idx} className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                            <div className="flex justify-between items-end mb-2">
+                              <span className="font-bold text-slate-800">{sub.name}</span>
+                              <span className="text-xs font-bold text-slate-500">{sub.pct}% Overall</span>
+                            </div>
+                            
+                            <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden flex mb-3">
+                              <div 
+                                className={`h-full ${sub.color} transition-all`}
+                                style={{ width: `${pctCompleted}%` }}
+                                title="Completed"
+                              ></div>
+                              <div 
+                                className="h-full bg-amber-400 transition-all opacity-80"
+                                style={{ width: `${pctInProgress}%` }}
+                                title="In Progress"
+                              ></div>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-medium">
+                              <div className="bg-white rounded p-1 border border-slate-200">
+                                <div className="text-slate-500 mb-0.5">Not Started</div>
+                                <div className="font-bold text-slate-700 text-xs">{sub.notStarted}</div>
+                              </div>
+                              <div className="bg-white rounded p-1 border border-slate-200">
+                                <div className="text-amber-600 mb-0.5">In Progress</div>
+                                <div className="font-bold text-amber-700 text-xs">{sub.inProgress}</div>
+                              </div>
+                              <div className="bg-white rounded p-1 border border-slate-200">
+                                <div className={`${sub.color.replace('bg-', 'text-')} mb-0.5`}>Completed</div>
+                                <div className="font-bold text-slate-700 text-xs">{sub.progress}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full ${sub.color} rounded-full`}
-                      style={{ width: `${sub.pct}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
