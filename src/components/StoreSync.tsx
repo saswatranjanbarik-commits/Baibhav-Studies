@@ -9,29 +9,37 @@
  *     `localStorage.setItem` so every save is also queued for Firestore.
  *  3. Queued saves are batched (800 ms) and written in a transaction that
  *     MERGES with what's already in the cloud (by item `id`), so two devices
- *     saving at once don't overwrite each other.
+ *     saving at once don't overwrite each other. (Rules: src/lib/syncMerge.ts)
  *  4. A `cloud_sync_update` window event tells pages to re-read their data.
  *
- * SAFETY IMPROVEMENTS (vs. the original)
- *  - Pending saves are flushed immediately when the tab is hidden or closed,
- *    so a quick edit followed by closing the tab is no longer lost.
- *  - Failed saves are kept and retried automatically instead of being dropped.
- *  - The save status (saving / saved / error) and the document size are
- *    exposed through `useSyncStatus()` so the UI can warn the user.
+ * SAFETY
+ *  - v1.1: failed saves are retried; save status is shown in the header.
+ *  - v1.3 (offline support):
+ *    · Unsaved changes are kept in this browser (SyncQueue) and survive going
+ *      offline, closing the tab or restarting the device. They upload
+ *      automatically when the connection returns.
+ *    · While changes are waiting, the app keeps SHOWING them (they are merged
+ *      on top of the cloud copy), so an offline log doesn't seem to vanish.
+ *    · The one-time "upload browser-only data" step now uses the same safe
+ *      merge as every other save, and only runs against fresh server data.
+ *    · If the cloud can't be reached at start-up, the app opens anyway with
+ *      the data already on this device.
  *
- * The merge rules and the data format are EXACTLY the same as before.
+ * The data format is EXACTLY the same as before.
  */
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { db } from '../lib/firebase';
-import { doc, setDoc, onSnapshot, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
 import { STORE_COLLECTION, STORE_DOC_ID, STORE_KEY_PREFIX } from '../lib/storeKeys';
+import { isIdObjectArray, mergeValue } from '../lib/syncMerge';
+import { SyncQueue } from '../lib/syncQueue';
 
 // ---------------------------------------------------------------------------
 // Sync status shared with the rest of the app
 // ---------------------------------------------------------------------------
 
-export type SyncState = 'idle' | 'saving' | 'saved' | 'error';
+export type SyncState = 'idle' | 'saving' | 'saved' | 'error' | 'offline';
 
 export interface SyncStatus {
   state: SyncState;
@@ -39,6 +47,8 @@ export interface SyncStatus {
   lastError: string | null;
   /** Approximate size of the cloud document in bytes. */
   docSizeBytes: number;
+  /** Number of data sets with changes not yet saved to the cloud. */
+  pendingCount: number;
   /** Retry any failed saves right now. */
   retryNow: () => void;
 }
@@ -47,73 +57,12 @@ const SyncStatusContext = createContext<SyncStatus>({
   state: 'idle',
   lastError: null,
   docSizeBytes: 0,
+  pendingCount: 0,
   retryNow: () => {},
 });
 
 /** Read the current cloud-sync status from any component. */
 export const useSyncStatus = () => useContext(SyncStatusContext);
-
-// ---------------------------------------------------------------------------
-// Merge helpers (logic unchanged from the original implementation)
-// ---------------------------------------------------------------------------
-
-/** True if either array contains objects that carry an `id`. */
-function isIdObjectArray(a: any[], b: any[]): boolean {
-  const hasId = (arr: any[]) =>
-    arr.length > 0 && typeof arr[0] === 'object' && arr[0] !== null && 'id' in arr[0];
-  return hasId(a) || hasId(b);
-}
-
-/**
- * Merge one key's new local value with the value currently in the cloud.
- *  - Arrays of {id} objects: local edits win; items the user deleted are
- *    removed; items added elsewhere that this device never saw are kept.
- *  - Arrays of plain values: union.
- *  - Plain objects: shallow merge.
- *  - Anything else: the new value wins.
- */
-function mergeValue(existingValue: any, newVal: any, lastKnownValue: any): any {
-  if (existingValue === undefined) return newVal;
-
-  if (Array.isArray(existingValue) && Array.isArray(newVal)) {
-    if (!isIdObjectArray(newVal, existingValue)) {
-      return Array.from(new Set([...existingValue, ...newVal]));
-    }
-
-    const lastKnownIds = new Set<string>();
-    (Array.isArray(lastKnownValue) ? lastKnownValue : []).forEach((item: any) => {
-      if (item && item.id) lastKnownIds.add(item.id);
-    });
-
-    const userNewMap = new Map<string, any>();
-    newVal.forEach((item: any) => { if (item && item.id) userNewMap.set(item.id, item); });
-
-    const mergedMap = new Map<string, any>();
-    existingValue.forEach((item: any) => {
-      if (!item || !item.id) return;
-      if (userNewMap.has(item.id)) {
-        mergedMap.set(item.id, userNewMap.get(item.id)); // user's version wins
-      } else if (!lastKnownIds.has(item.id)) {
-        mergedMap.set(item.id, item); // added elsewhere; user never saw it — keep
-      }
-      // else: user saw it and removed it — it's a deliberate delete
-    });
-    newVal.forEach((item: any) => {
-      if (item && item.id && !mergedMap.has(item.id)) mergedMap.set(item.id, item);
-    });
-    return Array.from(mergedMap.values());
-  }
-
-  if (
-    typeof existingValue === 'object' && existingValue !== null &&
-    typeof newVal === 'object' && newVal !== null &&
-    !Array.isArray(existingValue) && !Array.isArray(newVal)
-  ) {
-    return { ...existingValue, ...newVal };
-  }
-
-  return newVal;
-}
 
 /** Approximate stored size of a value, in bytes. */
 function approxSizeBytes(value: unknown): number {
@@ -126,6 +75,10 @@ function approxSizeBytes(value: unknown): number {
 
 const DEBOUNCE_MS = 800;
 const RETRY_MS = 10_000;
+/** If the cloud hasn't answered by then, open the app with local data. */
+const STARTUP_TIMEOUT_MS = 5_000;
+
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -136,19 +89,19 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
   const [syncState, setSyncState] = useState<SyncState>('idle');
   const [lastError, setLastError] = useState<string | null>(null);
   const [docSizeBytes, setDocSizeBytes] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
   const { currentUser } = useAuth();
 
-  // What the cloud told us last — lets us tell a deliberate delete apart from
-  // an item that another device added after we loaded.
+  // What the cloud told us last.
   const lastKnownCloudData = useRef<Record<string, any>>({});
-  // Whether the one-time "upload old local-only data" step has run.
+  // Whether the one-time "upload browser-only data" step has run.
   const initialUploadDone = useRef<boolean>(false);
   // Exposed so the UI's "Retry" button can trigger a flush.
   const flushRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const originalSetItem = window.localStorage.setItem;
-    const storeRef = doc(db, STORE_COLLECTION, STORE_DOC_ID);
+    const originalRemoveItem = window.localStorage.removeItem;
 
     if (!currentUser) {
       setLoading(false);
@@ -156,134 +109,67 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
     }
 
     setLoading(true);
-
-    // ---- 1. Cloud → local ---------------------------------------------------
-    const unsubscribe = onSnapshot(storeRef, (docSnap) => {
-      const data: Record<string, any> = docSnap.exists() ? docSnap.data() : {};
-
-      lastKnownCloudData.current = JSON.parse(JSON.stringify(data));
-      setDocSizeBytes(approxSizeBytes(data));
-
-      // One-time migration: push any data that only exists in this browser's
-      // localStorage (from before cloud sync existed) up to the cloud.
-      if (!initialUploadDone.current) {
-        const localUploads: Record<string, any> = {};
-
-        for (let i = 0; i < window.localStorage.length; i++) {
-          const key = window.localStorage.key(i);
-          if (!key || !key.startsWith(STORE_KEY_PREFIX)) continue;
-          const localValue = window.localStorage.getItem(key);
-          if (!localValue) continue;
-
-          try {
-            const parsedLocal = JSON.parse(localValue);
-            const cloudValue = data[key];
-
-            if (cloudValue === undefined) {
-              localUploads[key] = parsedLocal;
-              data[key] = parsedLocal;
-            } else if (Array.isArray(parsedLocal) && Array.isArray(cloudValue)) {
-              if (isIdObjectArray(parsedLocal, cloudValue)) {
-                // Add local items the cloud doesn't have yet.
-                const cloudMap = new Map<string, any>();
-                cloudValue.forEach((item: any) => { if (item && item.id) cloudMap.set(item.id, item); });
-                let merged = false;
-                parsedLocal.forEach((item: any) => {
-                  if (item && item.id && !cloudMap.has(item.id)) {
-                    cloudMap.set(item.id, item);
-                    merged = true;
-                  }
-                });
-                if (merged) {
-                  localUploads[key] = Array.from(cloudMap.values());
-                  data[key] = localUploads[key];
-                }
-              } else {
-                const combined = Array.from(new Set([...cloudValue, ...parsedLocal]));
-                if (combined.length > cloudValue.length) {
-                  localUploads[key] = combined;
-                  data[key] = combined;
-                }
-              }
-            }
-          } catch {
-            // Ignore unparseable local values — never block loading.
-          }
-        }
-
-        if (Object.keys(localUploads).length > 0) {
-          console.log('Uploading local-only data to cloud…', Object.keys(localUploads));
-          setDoc(storeRef, localUploads, { merge: true }).catch((e) => {
-            console.error('Initial upload failed', e);
-            setSyncState('error');
-            setLastError(describeError(e));
-          });
-        }
-        initialUploadDone.current = true;
-      }
-
-      // Mirror cloud values into localStorage (bypassing our wrapper so this
-      // doesn't trigger another cloud write).
-      let changed = false;
-      for (const [key, value] of Object.entries(data)) {
-        const stringified = JSON.stringify(value);
-        if (window.localStorage.getItem(key) !== stringified) {
-          originalSetItem.call(window.localStorage, key, stringified);
-          changed = true;
-        }
-      }
-      if (changed) window.dispatchEvent(new Event('cloud_sync_update'));
-
-      setLoading(false);
-    }, (error) => {
-      console.error('Error in store sync snapshot:', error);
-      setSyncState('error');
-      setLastError(describeError(error));
-      setLoading(false);
-    });
-
-    // ---- 2. Local → cloud ---------------------------------------------------
-    let pendingUpdates: Record<string, any> = {};
+    const storeRef = doc(db, STORE_COLLECTION, STORE_DOC_ID);
+    let disposed = false;
     let syncTimeout: ReturnType<typeof setTimeout> | undefined;
     let retryTimeout: ReturnType<typeof setTimeout> | undefined;
-    let inFlight = false;
-    let disposed = false; // set when the user logs out / component unmounts
 
+    // ---- 0. The durable queue of unsaved changes (per user, this browser only)
+    // No "dugu_" prefix, so it is never uploaded itself.
+    const PENDING_KEY = `edutrack_pending_sync:${currentUser.email.toLowerCase()}`;
+    const queue = new SyncQueue(
+      (json) => {
+        try {
+          if (json) originalSetItem.call(window.localStorage, PENDING_KEY, json);
+          else originalRemoveItem.call(window.localStorage, PENDING_KEY);
+        } catch { /* storage full/blocked — the in-memory queue still works */ }
+        setPendingCount(queue ? queue.size : 0);
+      },
+      window.localStorage.getItem(PENDING_KEY),
+    );
+    setPendingCount(queue.size);
+    if (queue.size > 0) setSyncState(isOffline() ? 'offline' : 'saving');
+
+    const markFailure = (e: any) => {
+      if (isOffline() || e?.code === 'unavailable') {
+        setSyncState('offline');
+        setLastError(null);
+      } else {
+        setSyncState('error');
+        setLastError(describeError(e));
+      }
+    };
+
+    // ---- 1. Local → cloud -------------------------------------------------
     /** Write everything queued so far to Firestore. */
     const flush = () => {
       clearTimeout(syncTimeout);
       clearTimeout(retryTimeout);
-      if (inFlight || Object.keys(pendingUpdates).length === 0) return;
+      if (disposed || queue.isSending || !queue.hasQueued()) return;
+      if (isOffline()) { setSyncState('offline'); return; } // the 'online' event will flush
 
-      const updatesToPush = pendingUpdates;
-      pendingUpdates = {};
-      inFlight = true;
+      const toSend = queue.takeForSend();
       setSyncState('saving');
+      const written: Record<string, any> = {};
 
       runTransaction(db, async (transaction) => {
         const docSnap = await transaction.get(storeRef);
         const currentData = docSnap.exists() ? docSnap.data() : {};
-        const finalUpdates: Record<string, any> = {};
-        for (const [k, newVal] of Object.entries(updatesToPush)) {
-          finalUpdates[k] = mergeValue(currentData[k], newVal, lastKnownCloudData.current[k]);
+        for (const [k, newVal] of Object.entries(toSend)) {
+          written[k] = mergeValue(currentData[k], newVal, queue.baseFor(k, lastKnownCloudData.current[k]));
         }
-        transaction.set(storeRef, finalUpdates, { merge: true });
+        transaction.set(storeRef, written, { merge: true });
       })
         .then(() => {
-          inFlight = false;
+          queue.sendSucceeded(written);
           setLastError(null);
           setSyncState('saved');
-          // Anything saved while we were writing goes out next.
-          if (Object.keys(pendingUpdates).length > 0) flush();
+          if (queue.hasQueued()) flush(); // saved again while we were writing
         })
         .catch((e) => {
-          inFlight = false;
           console.error('Cloud sync failed — will retry:', e);
-          // Put the failed updates back in the queue (unless the user has
-          // saved a newer version of that key in the meantime).
-          pendingUpdates = { ...updatesToPush, ...pendingUpdates };
-          setSyncState('error');
-          setLastError(describeError(e));
+          queue.sendFailed();
+          markFailure(e);
           if (!disposed) retryTimeout = setTimeout(flush, RETRY_MS);
         });
     };
@@ -301,36 +187,114 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
       let parsedValue: any = value;
       try { parsedValue = JSON.parse(value); } catch { /* keep raw string */ }
 
-      pendingUpdates[key] = parsedValue;
-      setSyncState('saving');
+      queue.enqueue(key, parsedValue, lastKnownCloudData.current[key]);
+      setSyncState(isOffline() ? 'offline' : 'saving');
       clearTimeout(syncTimeout);
       syncTimeout = setTimeout(flush, DEBOUNCE_MS);
     };
 
-    // Flush immediately when the tab is hidden or closed so nothing is lost.
+    // ---- 2. Cloud → local -------------------------------------------------
+    const startupTimer = setTimeout(() => {
+      // No answer from the cloud (offline / slow): open with local data.
+      if (!disposed) {
+        setLoading(false);
+        if (isOffline()) setSyncState('offline');
+      }
+    }, STARTUP_TIMEOUT_MS);
+
+    const unsubscribe = onSnapshot(
+      storeRef,
+      // true: we must also hear when cached data is confirmed by the server
+      // (fromCache → false) even if nothing changed, to run the upload step.
+      { includeMetadataChanges: true },
+      (docSnap) => {
+        const data: Record<string, any> = docSnap.exists() ? docSnap.data() : {};
+        const fromServer = !docSnap.metadata.fromCache;
+
+        const previousKnown = lastKnownCloudData.current;
+        lastKnownCloudData.current = JSON.parse(JSON.stringify(data));
+        setDocSizeBytes(approxSizeBytes(data));
+
+        // One-time: upload data that exists only in this browser (e.g. from
+        // before cloud sync existed, or logged while the database was locked).
+        // Only against FRESH server data, and through the normal safe merge.
+        if (fromServer && !initialUploadDone.current) {
+          initialUploadDone.current = true;
+          const unconfirmed = queue.unconfirmed();
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (!key || !key.startsWith(STORE_KEY_PREFIX) || key in unconfirmed) continue;
+            try {
+              const parsedLocal = JSON.parse(window.localStorage.getItem(key) || 'null');
+              if (parsedLocal === null) continue;
+              const cloudValue = data[key];
+              if (cloudValue === undefined) {
+                queue.enqueue(key, parsedLocal, undefined);
+              } else if (Array.isArray(parsedLocal) && Array.isArray(cloudValue) && isIdObjectArray(parsedLocal, cloudValue)) {
+                const cloudIds = new Set(cloudValue.map((it: any) => it?.id).filter(Boolean));
+                const extras = parsedLocal.filter((it: any) => it && it.id && !cloudIds.has(it.id));
+                if (extras.length > 0) {
+                  console.log(`Uploading ${extras.length} browser-only item(s) for ${key}`);
+                  queue.enqueue(key, [...cloudValue, ...extras], cloudValue);
+                }
+              }
+            } catch { /* ignore unparseable local values */ }
+          }
+        }
+
+        // Mirror into localStorage, keeping any not-yet-saved local changes on top.
+        const unconfirmed = queue.unconfirmed();
+        const keys = new Set([...Object.keys(data), ...Object.keys(unconfirmed)]);
+        let changed = false;
+        for (const key of keys) {
+          if (!key.startsWith(STORE_KEY_PREFIX) && !(key in data)) continue;
+          const shown = queue.overlay(key, data[key], previousKnown[key]);
+          if (shown === undefined) continue;
+          const stringified = JSON.stringify(shown);
+          if (window.localStorage.getItem(key) !== stringified) {
+            originalSetItem.call(window.localStorage, key, stringified);
+            changed = true;
+          }
+        }
+        if (changed) window.dispatchEvent(new Event('cloud_sync_update'));
+
+        clearTimeout(startupTimer);
+        setLoading(false);
+
+        // Send anything waiting (from this visit, an earlier one, or the upload above).
+        if (fromServer && queue.hasQueued()) flush();
+      },
+      (error) => {
+        console.error('Error in store sync snapshot:', error);
+        clearTimeout(startupTimer);
+        markFailure(error);
+        setLoading(false);
+      },
+    );
+
+    // ---- 3. Connectivity & tab lifecycle ------------------------------------
+    const onOnline = () => { setSyncState(queue.size ? 'saving' : 'idle'); flush(); };
+    const onOffline = () => setSyncState('offline');
     const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
-      flush(); // last attempt to save anything still queued
+      flush(); // last attempt; anything unsent stays in the durable queue
       disposed = true;
       unsubscribe();
       clearTimeout(syncTimeout);
       clearTimeout(retryTimeout);
+      clearTimeout(startupTimer);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
       window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', onVisibility);
       window.localStorage.setItem = originalSetItem;
     };
   }, [currentUser]);
-
-  // Warn before closing the tab while a save is still pending or failing.
-  useEffect(() => {
-    if (syncState !== 'saving' && syncState !== 'error') return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [syncState]);
 
   if (loading) {
     return (
@@ -342,7 +306,7 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
 
   return (
     <SyncStatusContext.Provider
-      value={{ state: syncState, lastError, docSizeBytes, retryNow: () => flushRef.current() }}
+      value={{ state: syncState, lastError, docSizeBytes, pendingCount, retryNow: () => flushRef.current() }}
     >
       {children}
     </SyncStatusContext.Provider>

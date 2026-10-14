@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
+import InstallAppButton from './InstallAppButton';
 import { 
   BarChart2, 
   PenTool, 
@@ -16,11 +17,13 @@ import {
   ClipboardList,
   Star,
   Database,
+  TrendingUp,
   X
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: BarChart2, color: 'text-indigo-600', roles: ['Admin', 'Teacher', 'Student'] },
+  { name: 'Weekly Report', href: '/report', icon: TrendingUp, color: 'text-emerald-600', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Appreciation', href: '/appreciation', icon: Star, color: 'text-yellow-500', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Daily Log', href: '/daily-log', icon: ClipboardList, color: 'text-indigo-500', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Study Plan', href: '/plan', icon: PenTool, color: 'text-gray-600', roles: ['Admin', 'Teacher', 'Student'] },
@@ -98,6 +101,8 @@ export default function Sidebar({ mobileMenuOpen, setMobileMenuOpen }: SidebarPr
             })}
           </nav>
         </div>
+        {/* "Install app" / "Add to Home Screen" until installed (v1.3) */}
+        <InstallAppButton />
         <div className="p-4 border-t border-slate-200 text-[10px] text-slate-500 text-center flex items-center justify-center gap-1">
           <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block"></span>
           Live Sync &middot; {currentUser?.username || 'User'} &middot; Std 5A

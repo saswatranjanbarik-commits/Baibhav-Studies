@@ -18,7 +18,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Top Navigation Bar */}
-      <header className="h-14 bg-[#1F4E79] text-white flex items-center justify-between px-4 sticky top-0 z-50">
+      <header className="print:hidden h-14 bg-[#1F4E79] text-white flex items-center justify-between px-4 sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <button 
             className="md:hidden p-1.5 -ml-2 text-white hover:bg-white/20 rounded-lg transition-colors"
@@ -28,7 +28,7 @@ export default function Layout() {
           </button>
           <BookOpen className="h-6 w-6 text-indigo-300 hidden sm:block" />
           <h1 className="text-lg sm:text-xl font-extrabold tracking-tight font-sans whitespace-nowrap">Dugu EduTrack</h1>
-          <span className="hidden sm:inline text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold ml-1 sm:ml-2">v1.2</span>
+          <span className="hidden sm:inline text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold ml-1 sm:ml-2">v1.3</span>
           <SyncBadge />
         </div>
         
@@ -52,14 +52,14 @@ export default function Layout() {
       </header>
 
       {/* Save-failure / storage warnings (renders nothing when all is well) */}
-      <SyncBanner />
+      <div className="print:hidden"><SyncBanner /></div>
 
       {/* Fires study reminders while the app is open (renders a banner when due) */}
-      <ReminderScheduler />
+      <div className="print:hidden"><ReminderScheduler /></div>
 
-      <div className="flex flex-1 overflow-hidden relative">
-        <Sidebar mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 w-full">
+      <div className="flex flex-1 overflow-hidden relative print:overflow-visible">
+        <div className="contents print:hidden"><Sidebar mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} /></div>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 w-full print:overflow-visible print:p-0">
           <Outlet />
         </main>
       </div>
