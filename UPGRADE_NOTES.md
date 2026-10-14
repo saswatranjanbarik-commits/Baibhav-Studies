@@ -1,3 +1,44 @@
+# Upgrade notes — v1.2 (clock, team online, reminders, grouped flashcards)
+
+No existing data, collections or field names were changed. New, additive only:
+a `presence` collection and a `dugu_reminders` key in the store.
+
+## What's new
+- **Header clock** — the user's local time, date and time zone (with GMT offset),
+  detected from their device; updates every minute; compact on phones.
+- **Team Online (Dashboard)** — shows ONLY people who are logged in and using the
+  app right now, with their local time/zone. Everyone else is under "Offline"
+  with "last seen". Exit marks you offline immediately; closing the tab drops
+  you off within ~3 minutes.
+- **Study Plan → Daily study reminder** — per user: time, days, message, and
+  optional reminders 5–30 min before planned sessions. Delivered by:
+  - **Add to calendar (.ics)** — repeating event with an alarm; works when the
+    app is closed (best for phones). Also exports upcoming plan sessions.
+  - **Browser notifications** while the app is open (any tab).
+  - **In-app banner** if the app is opened after the reminder time.
+- **Flashcards & Quiz grouped by Subject → Chapter → Topic** — counts at every
+  level, "+ Card / + Quiz" on each topic (pre-selects the topic), and
+  Practice/Quiz buttons for a whole subject, a chapter or a single topic.
+  The Syllabus page's flashcard/quiz links now open the right session.
+- **Automatic build check** on GitHub for every push (free).
+
+## ⚠️ Required: update Firestore rules
+Team Online needs one new rule block. Re-publish `firestore.rules`
+(Firebase Console → Firestore → Rules → paste → Publish). Without it the app
+still works; the Team Online panel just shows a notice.
+
+## New / changed files (v1.2)
+New: src/lib/timezone.ts, src/lib/presence.ts, src/lib/reminders.ts,
+src/lib/learningTree.ts, src/components/HeaderClock.tsx,
+src/components/TeamOnline.tsx, src/components/ReminderScheduler.tsx,
+src/components/ReminderSettingsCard.tsx, src/components/LearningTree.tsx,
+public/sw.js, .github/workflows/build-check.yml
+Changed: firestore.rules, README.md, UPGRADE_NOTES.md, src/components/Layout.tsx,
+src/lib/AuthContext.tsx, src/lib/storeKeys.ts, src/pages/Dashboard.tsx,
+src/pages/StudyPlan.tsx, src/pages/Flashcards.tsx
+
+---
+
 # Upgrade notes — v1.1 (safety, security & bug fixes)
 
 No database collections, documents or field names were changed.

@@ -56,6 +56,13 @@ service cloud.firestore {
       allow read, write: if isRegistered();
     }
 
+    // "Who's online" status: presence/{lower-case email}
+    // Everyone registered can see it; each person can only update their own.
+    match /presence/{email} {
+      allow read: if isRegistered();
+      allow write: if isRegistered() && email == myEmail();
+    }
+
     // Everything else is closed by default.
   }
 }

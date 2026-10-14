@@ -27,14 +27,22 @@ npm run build    # production build into /dist (what Vercel runs)
 | `src/pages/*` | One file per screen |
 | `src/pages/Backup.tsx` | Admin backup download / restore-missing-items |
 | `firestore.rules` | Database security rules (publish manually in the Firebase Console) |
+| `src/lib/presence.ts` | "Who's online" heartbeat (collection `presence`) |
+| `src/lib/reminders.ts` | Study reminder settings, notifications, calendar (.ics) export |
+| `src/components/ReminderScheduler.tsx` | Fires reminders while the app is open |
+| `src/lib/learningTree.ts` | Groups flashcards/quizzes by Subject → Chapter → Topic |
+| `public/sw.js` | Tiny service worker, only for notifications (no caching) |
+| `.github/workflows/build-check.yml` | Free GitHub build check on every push |
 
 ## Data model (do not break)
 
 * `users/{lower-case email}` → `{ id, email, username, role, timezone }`
+* `presence/{lower-case email}` → online status (v1.2, new collection)
 * `appStore/global_store` → one field per data set (`dugu_daily_logs`,
   `dugu_syllabus_v2`, `dugu_study_plan`, `dugu_revisions`, `dugu_tasks`,
   `dugu_events`, `dugu_timetable`, `dugu_study_notes`, `dugu_team_notes`,
-  `dugu_learning_items`, `dugu_appreciation`, `dugu_upcoming_event`).
+  `dugu_learning_items`, `dugu_appreciation`, `dugu_upcoming_event`,
+  `dugu_reminders` (v1.2)).
 
 Pages read/write `localStorage` with these keys; `StoreSync` mirrors them to
 Firestore. New features must **add** keys or **optional** fields — never rename

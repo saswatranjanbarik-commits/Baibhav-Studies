@@ -22,6 +22,7 @@ export const STORE_KEYS = {
   learningItems: 'dugu_learning_items', // flashcards & quizzes
   appreciation: 'dugu_appreciation',
   upcomingEvent: 'dugu_upcoming_event',
+  reminders: 'dugu_reminders', // v1.2: per-user study reminder settings
 } as const;
 
 /** Every key that StoreSync mirrors starts with this prefix. */
