@@ -13,7 +13,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, signInWithEmailAndPassword, logoutAuth } from './firebase';
+import { auth, db, signInWithEmailAndPassword, logoutAuth, rememberLogin } from './firebase';
 import { PRIMARY_ADMIN_EMAIL } from '../config/app';
 import { markOffline } from './presence';
 
@@ -30,7 +30,7 @@ interface AuthContextType {
   loading: boolean;
   /** Why the last login was rejected (e.g. account not registered). */
   authError: string | null;
-  login: (email?: string, password?: string) => Promise<void>;
+  login: (email?: string, password?: string, keepSignedIn?: boolean) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -46,6 +46,16 @@ export const useAuth = () => useContext(AuthContext);
 
 export const isPrimaryAdmin = (email?: string | null) =>
   !!email && email.toLowerCase() === PRIMARY_ADMIN_EMAIL;
+
+// A copy of the user's profile on this device, used when offline.
+// (No "dugu_" prefix → never uploaded.)
+const profileKey = (email: string) => `edutrack_profile:${email.toLowerCase()}`;
+function saveCachedProfile(user: AppUser) {
+  try { localStorage.setItem(profileKey(user.email), JSON.stringify(user)); } catch { /* ignore */ }
+}
+function loadCachedProfile(email: string): Partial<AppUser> | null {
+  try { return JSON.parse(localStorage.getItem(profileKey(email)) || 'null'); } catch { return null; }
+}
 
 const NOT_REGISTERED_MESSAGE =
   'This account has not been added to the app. Please ask the admin to add you on the Manage Users page.';
@@ -81,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (userDoc.exists()) {
           appUser = { ...appUser, ...userDoc.data() } as AppUser;
+          saveCachedProfile(appUser);
           // The primary admin must always stay Admin.
           if (primaryAdmin && appUser.role !== 'Admin') {
             appUser.role = 'Admin';
@@ -100,9 +111,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await rejectLogin(NOT_REGISTERED_MESSAGE);
           return;
         }
-        // Network hiccup etc.: keep the user signed in with default values,
-        // exactly as the app did before.
-        console.error('Error fetching/updating user profile:', error);
+        // Offline / network hiccup: keep the user signed in, using the profile
+        // saved on this device last time (so the role and name stay right).
+        console.warn('Could not load user profile from the cloud:', error);
+        const cached = loadCachedProfile(email);
+        if (cached) appUser = { ...appUser, ...cached };
       }
 
       setAuthError(null);
@@ -121,9 +134,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const login = async (email?: string, password?: string) => {
+  const login = async (email?: string, password?: string, keepSignedIn = true) => {
     if (!email || !password) throw new Error('Email and password required');
     setAuthError(null);
+    await rememberLogin(keepSignedIn);
     await signInWithEmailAndPassword(auth, email.trim(), password);
   };
 

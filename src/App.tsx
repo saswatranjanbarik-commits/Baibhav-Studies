@@ -27,6 +27,7 @@ import Timetable from './pages/Timetable';
 import ManageUsers from './pages/ManageUsers';
 import Appreciation from './pages/Appreciation';
 import Backup from './pages/Backup';
+import WeeklyReport from './pages/WeeklyReport';
 
 export default function App() {
   return (
@@ -49,6 +50,7 @@ export default function App() {
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/timetable" element={<Timetable />} />
                 <Route path="/appreciation" element={<Appreciation />} />
+                <Route path="/report" element={<WeeklyReport />} />
                 <Route path="*" element={<Dashboard />} />
 
                 {/* Teacher & Admin only */}

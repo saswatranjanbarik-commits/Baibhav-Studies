@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../lib/AuthContext';
 import TeamOnline from '../components/TeamOnline';
+import StreakCard from '../components/StreakCard';
 import { STORE_KEYS } from '../lib/storeKeys';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Star, BarChart3, CheckCircle2, Clock, Calendar as CalendarIcon, RefreshCw, Trophy, Target, Sparkles, Globe2, Edit3, X } from 'lucide-react';
@@ -295,6 +296,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Study streak & badges (v1.3) */}
+      <StreakCard />
 
       {/* Team Online — only people currently logged in */}
       <TeamOnline />
