@@ -14,6 +14,7 @@ import {
   buildWeeklyReport, weekStart, formatMinutes, LogLike, RevisionLike, TaskLike, PointsLike,
 } from '../lib/studyStats';
 import DayBarChart from '../components/DayBarChart';
+import { loadRevisionSettings, isCurrentRevision } from '../lib/revisionReset';
 
 const fmtDay = (d: string, opts: Intl.DateTimeFormatOptions) => parseDateStr(d).toLocaleDateString('en-GB', opts);
 
@@ -29,7 +30,12 @@ function Tile({ icon, label, value, sub }: { icon: React.ReactNode; label: strin
 
 export default function WeeklyReport() {
   const logs = useStoredData<LogLike[]>(STORE_KEYS.dailyLogs, []);
-  const revisions = useStoredData<RevisionLike[]>(STORE_KEYS.revisions, []);
+  const allRevisions = useStoredData<RevisionLike[]>(STORE_KEYS.revisions, []);
+  const revSettings = useStoredData(STORE_KEYS.revisionSettings, null); // re-render when it changes
+  const revisions = useMemo(() => {
+    const s = loadRevisionSettings();
+    return allRevisions.filter((r) => isCurrentRevision(r, s));
+  }, [allRevisions, revSettings]);
   const tasks = useStoredData<TaskLike[]>(STORE_KEYS.tasks, []);
   const points = useStoredData<PointsLike[]>(STORE_KEYS.appreciation, []);
 

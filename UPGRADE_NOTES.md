@@ -1,7 +1,8 @@
 # Upgrade notes — v1.3 (stay signed in, installable app & offline, streaks, weekly report)
 
 No existing data, collections or field names were changed, and nothing new is
-stored in the cloud. Firestore rules are unchanged from v1.2.
+stored in the cloud except three small keys (see below). Firestore
+rules are unchanged from v1.2.
 
 ## What's new
 - **Stay signed in** — logins are remembered on the device until "Exit".
@@ -19,6 +20,22 @@ stored in the cloud. Firestore rules are unchanged from v1.2.
 - **Weekly Report** (new menu item) — study time per day and per subject,
   topics completed, doubts to discuss, revisions done/missed, tasks, points,
   comparison with last week. Browse previous weeks; "Print / PDF".
+- **Revision Planner → Fresh start** (Admin) — archives all current revisions
+  (nothing deleted; a backup file is downloaded too) and creates new revisions
+  only for study logged from a chosen date. "Restore archived" undoes it.
+  New store keys: `dugu_revision_settings`, `dugu_revisions_archive`.
+- **Syllabus → Mark topics completed** (Tutor/Teacher & Admin) — tick off
+  topics covered in class (e.g. before the mid-term) without Daily Log entries:
+  a bulk checklist per subject (whole chapter / all Term-1 chapters / select
+  all), plus "✓ Mark completed" on each topic, "✓ Mark chapter completed" on
+  each chapter, and "Unmark". Marks show who marked them and when, and count
+  in Syllabus status and Dashboard subject progress. They do NOT create Daily
+  Log entries, revisions or streak days. New store key: `dugu_topic_status`.
+- **Fix:** Syllabus now counts a Daily Log entry that covers several topics
+  for each of those topics (before, such topics stayed "Pending").
+- **Fix:** the one-time "upload browser-only data" rescue now runs once per
+  device. Before, items deleted on one device could reappear when another
+  device opened the app.
 
 ## Notes
 - Study *time* needs "Time from / Time to" on Daily Log entries; entries
@@ -33,12 +50,15 @@ stored in the cloud. Firestore rules are unchanged from v1.2.
 New: src/lib/syncMerge.ts, src/lib/syncQueue.ts, src/lib/studyStats.ts,
 src/lib/useStoredData.ts, src/lib/installApp.ts, src/components/StreakCard.tsx,
 src/components/DayBarChart.tsx, src/components/InstallAppButton.tsx,
-src/pages/WeeklyReport.tsx, public/manifest.webmanifest, public/favicon.png,
-public/icons/(4 icons)
+src/pages/WeeklyReport.tsx, src/lib/revisionReset.ts, src/lib/topicStatus.ts,
+src/components/TopicCompletionModal.tsx,
+public/manifest.webmanifest, public/favicon.png, public/icons/(4 icons)
 Changed: index.html, public/sw.js, src/main.tsx, src/App.tsx,
 src/components/StoreSync.tsx, src/components/SyncStatusBar.tsx,
 src/components/Layout.tsx, src/components/Sidebar.tsx, src/lib/firebase.ts,
-src/lib/AuthContext.tsx, src/pages/Login.tsx, src/pages/Dashboard.tsx,
+src/lib/AuthContext.tsx, src/lib/storeKeys.ts, src/pages/Login.tsx,
+src/pages/Dashboard.tsx, src/pages/Revisions.tsx, src/pages/DailyLog.tsx,
+src/components/StreakCard.tsx, src/pages/WeeklyReport.tsx, src/pages/Syllabus.tsx,
 README.md, UPGRADE_NOTES.md
 
 ---
