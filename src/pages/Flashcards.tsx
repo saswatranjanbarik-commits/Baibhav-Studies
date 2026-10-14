@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Target, Plus, X, Search, Filter, Layers, CheckCircle2, ChevronRight, ChevronLeft, Trash2, Upload, Download } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useSearchParams } from 'react-router-dom';
+import { todayStr } from '../lib/dates';
 
 type ItemType = 'flashcard' | 'quiz';
 
@@ -241,7 +242,7 @@ export default function Flashcards() {
             uniqueTopics.add(topicKey);
             const newLog = {
               id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-              date: new Date().toISOString().split('T')[0],
+              date: todayStr(),
               subjectId: item.subjectId,
               subjectName: item.subjectName,
               chapterId: item.chapterId,

@@ -3,34 +3,56 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
 import { BookOpen, AlertCircle } from 'lucide-react';
 
+/**
+ * Login page.
+ *
+ * Public sign-up has been removed on purpose: new accounts are created by the
+ * Admin on the Manage Users page. This stops strangers from registering and
+ * reaching the study data.
+ */
+
+/** Translate Firebase auth error codes into friendly messages. */
+function friendlyAuthError(err: any): string {
+  switch (err?.code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Incorrect email or password.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a few minutes and try again.';
+    case 'auth/network-request-failed':
+      return 'No internet connection. Please check your connection and try again.';
+    default:
+      return err?.message || 'Failed to log in. Please check your credentials.';
+  }
+}
+
 export default function Login() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const navigate = useNavigate();
-  const { login, signUp, currentUser } = useAuth();
+  const { login, currentUser, authError } = useAuth();
 
   useEffect(() => {
-    if (currentUser) {
-      navigate('/');
-    }
+    if (currentUser) navigate('/');
   }, [currentUser, navigate]);
+
+  // Show the reason if the account was signed out for not being registered.
+  useEffect(() => {
+    if (authError) setError(authError);
+  }, [authError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      if (isLogin) {
-        await login(email, password);
-      } else {
-        await signUp(email, password);
-      }
+      await login(email, password);
     } catch (err: any) {
-      setError(err.message || `Failed to ${isLogin ? 'log in' : 'sign up'}. Please check your credentials.`);
+      setError(friendlyAuthError(err));
       console.error(err);
     } finally {
       setLoading(false);
@@ -47,7 +69,7 @@ export default function Login() {
           Dugu EduTrack
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
-          {isLogin ? 'Sign in to access your dashboard' : 'Create a new account'}
+          Sign in to access your dashboard
         </p>
       </div>
 
@@ -99,19 +121,13 @@ export default function Login() {
                 disabled={loading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
-                {loading ? (isLogin ? 'Signing in...' : 'Signing up...') : (isLogin ? 'Sign in' : 'Sign up')}
+                {loading ? 'Signing in...' : 'Sign in'}
               </button>
             </div>
             
-            <div className="mt-4 text-center">
-              <button 
-                type="button" 
-                onClick={() => setIsLogin(!isLogin)} 
-                className="text-sm text-indigo-600 hover:text-indigo-500"
-              >
-                {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-              </button>
-            </div>
+            <p className="mt-4 text-center text-xs text-slate-500">
+              Need an account? Ask the admin to add you.
+            </p>
           </form>
         </div>
       </div>

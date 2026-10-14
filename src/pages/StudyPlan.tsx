@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PenTool, Plus, X, Search, Filter, Clock } from 'lucide-react';
+import { todayStr } from '../lib/dates';
 
 type PlanType = 'Teaching' | 'Self Study' | 'Quiz' | 'Flashcard' | 'Task' | 'Assessment';
 
@@ -32,7 +33,7 @@ export default function StudyPlan() {
 
   const [newEntry, setNewEntry] = useState<Partial<StudyPlanEntry>>({
     status: 'Pending',
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: todayStr(),
     planType: 'Self Study'
   });
 
@@ -73,7 +74,7 @@ export default function StudyPlan() {
       subTopicId: newEntry.subTopicId,
       subTopicName: activeTopic?.subTopics?.find((st: any) => st.id === newEntry.subTopicId)?.name || '',
       status: newEntry.status || 'Pending',
-      startDate: newEntry.startDate || new Date().toISOString().split('T')[0],
+      startDate: newEntry.startDate || todayStr(),
       timeFrom: newEntry.timeFrom,
       timeTo: newEntry.timeTo,
       planType: newEntry.planType || 'Self Study',
@@ -86,7 +87,7 @@ export default function StudyPlan() {
     setShowAdd(false);
     setNewEntry({
       status: 'Pending',
-      startDate: new Date().toISOString().split('T')[0],
+      startDate: todayStr(),
       planType: 'Self Study'
     });
   };

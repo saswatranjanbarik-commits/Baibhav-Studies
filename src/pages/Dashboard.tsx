@@ -1,15 +1,16 @@
 import React from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useTeamUsers } from '../lib/useTeamUsers';
+import { STORE_KEYS } from '../lib/storeKeys';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Star, BarChart3, CheckCircle2, Clock, Calendar as CalendarIcon, RefreshCw, Trophy, Target, Sparkles, Globe2, Edit3, X } from 'lucide-react';
+import { todayStr, toDateStr, parseDateStr } from '../lib/dates';
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
   
   const [totalPoints, setTotalPoints] = React.useState(0);
-  const [upcomingEvent, setUpcomingEvent] = React.useState({ name: 'Upcoming Event', date: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0] });
+  const [upcomingEvent, setUpcomingEvent] = React.useState({ name: 'Upcoming Event', date: toDateStr(new Date(new Date().getFullYear(), 11, 31)) });
   const [isEditingEvent, setIsEditingEvent] = React.useState(false);
   
   const [topicsLogged, setTopicsLogged] = React.useState(0);
@@ -18,14 +19,14 @@ export default function Dashboard() {
   const [overallProgress, setOverallProgress] = React.useState(0);
   const [recentTopics, setRecentTopics] = React.useState<any[]>([]);
   const [subjectProgress, setSubjectProgress] = React.useState<any[]>([]);
-  const [teamUsers, setTeamUsers] = React.useState<any[]>([]);
+  // Loaded once per visit (used to be re-downloaded after every save).
+  const teamUsers = useTeamUsers();
   const navigate = useNavigate();
 
   React.useEffect(() => {
     const load = () => {
     // Basic local load first
     const loadFromLocal = async () => {
-      try { const usersSnap = await getDocs(collection(db, 'users')); setTeamUsers(usersSnap.docs.map(d => d.data())); } catch (e) { console.error(e); }
 
       // 1. Load points
       const savedAppreciation = localStorage.getItem('dugu_appreciation');
@@ -39,11 +40,16 @@ export default function Dashboard() {
       if (savedEvent) setUpcomingEvent(JSON.parse(savedEvent));
 
       // 4. Load Revisions
-      const savedRevisions = localStorage.getItem('dugu_revisions');
+      const savedRevisions = localStorage.getItem(STORE_KEYS.revisions);
       if (savedRevisions) {
         const revs = JSON.parse(savedRevisions);
-        const today = new Date().toISOString().split('T')[0];
-        const due = revs.filter((r: any) => r.status === 'Pending' && r.nextRevisionDate <= today);
+        const today = todayStr();
+        // Revisions are saved with `dateScheduled` (older code here looked for a
+        // `nextRevisionDate` field that never exists, so this always showed 0).
+        const due = revs.filter((r: any) => {
+          const date = r.dateScheduled || r.nextRevisionDate;
+          return r.status === 'Pending' && !!date && date <= today;
+        });
         setRevisionsDue(due.length);
       }
 
@@ -144,7 +150,7 @@ export default function Dashboard() {
     setIsEditingEvent(false);
   };
 
-  const daysLeft = Math.ceil((new Date(upcomingEvent.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+  const daysLeft = Math.ceil((parseDateStr(upcomingEvent.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
 
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
