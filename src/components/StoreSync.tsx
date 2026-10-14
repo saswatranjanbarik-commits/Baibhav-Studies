@@ -20,8 +20,9 @@
  *      automatically when the connection returns.
  *    · While changes are waiting, the app keeps SHOWING them (they are merged
  *      on top of the cloud copy), so an offline log doesn't seem to vanish.
- *    · The one-time "upload browser-only data" step now uses the same safe
- *      merge as every other save, and only runs against fresh server data.
+ *    · The one-time "upload browser-only data" rescue now uses the same safe
+ *      merge as every other save, only runs against fresh server data, and
+ *      runs once per device (so deletions made elsewhere don't come back).
  *    · If the cloud can't be reached at start-up, the app opens anyway with
  *      the data already on this device.
  *
@@ -215,11 +216,19 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
         lastKnownCloudData.current = JSON.parse(JSON.stringify(data));
         setDocSizeBytes(approxSizeBytes(data));
 
-        // One-time: upload data that exists only in this browser (e.g. from
-        // before cloud sync existed, or logged while the database was locked).
-        // Only against FRESH server data, and through the normal safe merge.
+        // One-time rescue: upload data that exists only in this browser (e.g.
+        // from before cloud sync existed, or logged while the database was
+        // locked). Only against FRESH server data, through the normal safe
+        // merge, and only ONCE PER DEVICE: unsaved changes are now kept in the
+        // durable queue instead, and re-running this would bring back items
+        // that were deliberately deleted on another device.
+        const RESCUE_DONE_KEY = `edutrack_rescue_done:${currentUser.email.toLowerCase()}`;
+        if (fromServer && !initialUploadDone.current && window.localStorage.getItem(RESCUE_DONE_KEY)) {
+          initialUploadDone.current = true; // already done on this device
+        }
         if (fromServer && !initialUploadDone.current) {
           initialUploadDone.current = true;
+          try { originalSetItem.call(window.localStorage, RESCUE_DONE_KEY, new Date().toISOString()); } catch { /* ignore */ }
           const unconfirmed = queue.unconfirmed();
           for (let i = 0; i < window.localStorage.length; i++) {
             const key = window.localStorage.key(i);

@@ -2,7 +2,9 @@ import React from 'react';
 import { useAuth } from '../lib/AuthContext';
 import TeamOnline from '../components/TeamOnline';
 import StreakCard from '../components/StreakCard';
-import { STORE_KEYS } from '../lib/storeKeys';
+import { STORE_KEYS, readStore } from '../lib/storeKeys';
+import { makeTopicStatusLookup, TopicMark } from '../lib/topicStatus';
+import { loadRevisionSettings, isCurrentRevision } from '../lib/revisionReset';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Star, BarChart3, CheckCircle2, Clock, Calendar as CalendarIcon, RefreshCw, Trophy, Target, Sparkles, Globe2, Edit3, X } from 'lucide-react';
 import { todayStr, toDateStr, parseDateStr } from '../lib/dates';
@@ -45,7 +47,8 @@ export default function Dashboard() {
         const today = todayStr();
         // Revisions are saved with `dateScheduled` (older code here looked for a
         // `nextRevisionDate` field that never exists, so this always showed 0).
-        const due = revs.filter((r: any) => {
+        const revSettings = loadRevisionSettings(); // ignore revisions archived by a fresh start
+        const due = revs.filter((r: any) => isCurrentRevision(r, revSettings)).filter((r: any) => {
           const date = r.dateScheduled || r.nextRevisionDate;
           return r.status === 'Pending' && !!date && date <= today;
         });
@@ -87,25 +90,24 @@ export default function Dashboard() {
           let totalItems = 0;
           let completedItems = 0;
           
+          const statusLookup = makeTopicStatusLookup(logs, plan, readStore<TopicMark[]>(STORE_KEYS.topicStatus, []));
           const subProgs = syllabus.map((sub: any, idx: number) => {
             let subTotalTopics = 0;
             sub.chapters?.forEach((ch: any) => {
               subTotalTopics += ch.topics?.length || 0;
             });
             
-            const completedInPlan = plan.filter((p: any) => p.subjectId === sub.id && p.status === 'Completed').map((p: any) => p.topicId);
-            const completedInLogs = logs.filter((l: any) => l.subjectId === sub.id && l.status === 'Completed').map((l: any) => l.topicId);
-            const completedTopics = new Set([...completedInPlan, ...completedInLogs]);
-            const completedCount = Array.from(completedTopics).filter(id => id).length;
-            const additionalCompleted = [...completedInPlan, ...completedInLogs].filter(id => !id).length;
-            const completedInSub = completedCount + additionalCompleted;
-
-            const inProgressInPlan = plan.filter((p: any) => p.subjectId === sub.id && p.status === 'In Progress').map((p: any) => p.topicId);
-            const inProgressInLogs = logs.filter((l: any) => l.subjectId === sub.id && l.status === 'In Progress').map((l: any) => l.topicId);
-            const inProgressTopics = new Set([...inProgressInPlan, ...inProgressInLogs]);
-            const inProgressCount = Array.from(inProgressTopics).filter(id => id && !completedTopics.has(id)).length;
-            const additionalInProgress = [...inProgressInPlan, ...inProgressInLogs].filter(id => !id).length;
-            const inProgressInSub = inProgressCount + additionalInProgress;
+            // v1.3: one shared rule for topic status — tutor marks, Daily Log
+            // and Study Plan (src/lib/topicStatus.ts).
+            const topicIds: string[] = [];
+            sub.chapters?.forEach((ch: any) => ch.topics?.forEach((t: any) => topicIds.push(t.id)));
+            const statuses = topicIds.map((id) => statusLookup.status(id));
+            // Plan/log entries for this subject that aren't tied to a syllabus topic still count.
+            const untied = [...plan, ...logs].filter((x: any) => x.subjectId === sub.id && !x.topicId);
+            const completedInSub = statuses.filter((st) => st === 'Completed').length
+              + untied.filter((x: any) => x.status === 'Completed').length;
+            const inProgressInSub = statuses.filter((st) => st === 'In Progress').length
+              + untied.filter((x: any) => x.status === 'In Progress').length;
             
             const displayTotal = Math.max(subTotalTopics, plan.filter((p: any) => p.subjectId === sub.id).length);
             const notStartedInSub = Math.max(0, displayTotal - completedInSub - inProgressInSub);
@@ -113,7 +115,7 @@ export default function Dashboard() {
             totalItems += displayTotal;
             completedItems += completedInSub;
             
-            const pct = displayTotal > 0 ? Math.round((completedInSub / displayTotal) * 100) : 0;
+            const pct = displayTotal > 0 ? Math.min(100, Math.round((completedInSub / displayTotal) * 100)) : 0;
             
             return {
               id: sub.id,

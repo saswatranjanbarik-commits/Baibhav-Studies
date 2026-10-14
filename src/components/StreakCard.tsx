@@ -9,6 +9,7 @@ import { STORE_KEYS } from '../lib/storeKeys';
 import { useStoredData } from '../lib/useStoredData';
 import { todayStr, parseDateStr } from '../lib/dates';
 import { computeStreak, computeBadges, weekStart, weekDays, LogLike, RevisionLike } from '../lib/studyStats';
+import { allCompletedRevisions, RevisionEntry } from '../lib/revisionReset';
 
 export default function StreakCard() {
   const logs = useStoredData<LogLike[]>(STORE_KEYS.dailyLogs, []);
@@ -19,7 +20,8 @@ export default function StreakCard() {
     const streak = computeStreak(logs, today);
     return {
       streak,
-      badges: computeBadges(logs, revisions, streak),
+      // Archived (fresh start) revisions still count, so earned badges are never taken away.
+      badges: computeBadges(logs, allCompletedRevisions(revisions as RevisionEntry[]), streak),
       week: weekDays(weekStart(today)),
     };
   }, [logs, revisions, today]);

@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Search, Filter, CheckCircle } from 'lucide-react';
-import { parseDateStr } from '../lib/dates';
+import { RefreshCw, Search, Filter, CheckCircle, RotateCcw, X, Archive } from 'lucide-react';
+import { parseDateStr, addDays, todayStr } from '../lib/dates';
+import { useAuth } from '../lib/AuthContext';
+import { STORE_KEYS, readStore } from '../lib/storeKeys';
+import {
+  RevisionSettings, loadRevisionSettings, isCurrentRevision, tidyStaleRevisions,
+  performFreshStart, restoreArchivedRevisions, loadArchive,
+} from '../lib/revisionReset';
 
 interface RevisionEntry {
   id: string;
@@ -15,28 +21,53 @@ interface RevisionEntry {
 }
 
 export default function Revisions() {
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'Admin';
   const [revisions, setRevisions] = useState<RevisionEntry[]>([]);
+  const [settings, setSettings] = useState<RevisionSettings | null>(null);
+  const [archivedCount, setArchivedCount] = useState(0);
+  const [showFreshStart, setShowFreshStart] = useState(false);
+  const [freshFrom, setFreshFrom] = useState(addDays(todayStr(), 1));
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const load = () => {
-    const saved = localStorage.getItem('dugu_revisions');
-    if (saved) {
-      // Sort by scheduled date ascending
-      const parsed: RevisionEntry[] = JSON.parse(saved);
-      parsed.sort((a, b) => new Date(a.dateScheduled).getTime() - new Date(b.dateScheduled).getTime());
-      setRevisions(parsed);
-    }
-      };
+      const s = loadRevisionSettings();
+      setSettings(s);
+      setArchivedCount(loadArchive().reduce((n, b) => n + b.items.length, 0));
+      // Only revisions from the current plan (after any fresh start), soonest first.
+      const all = readStore<RevisionEntry[]>(STORE_KEYS.revisions, []);
+      const current = all.filter((r) => isCurrentRevision(r, s));
+      current.sort((a, b) => a.dateScheduled.localeCompare(b.dateScheduled));
+      setRevisions(current);
+    };
+    // Put back into the archive any old revisions a stale device re-uploaded.
+    tidyStaleRevisions();
     load();
     window.addEventListener('cloud_sync_update', load);
     return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
   const markCompleted = (id: string) => {
-    const updated = revisions.map(r => r.id === id ? { ...r, status: 'Completed' as const } : r);
-    setRevisions(updated);
-    localStorage.setItem('dugu_revisions', JSON.stringify(updated));
+    // Update the FULL saved list (not just the visible one) so nothing else is touched.
+    const all = readStore<RevisionEntry[]>(STORE_KEYS.revisions, []);
+    const updated = all.map(r => r.id === id ? { ...r, status: 'Completed' as const } : r);
+    localStorage.setItem(STORE_KEYS.revisions, JSON.stringify(updated));
   };
+
+  const handleFreshStart = () => {
+    const n = performFreshStart(freshFrom, currentUser?.email);
+    setShowFreshStart(false);
+    setNotice(`Fresh start set from ${parseDateStr(freshFrom).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}. ${n} old revision${n === 1 ? '' : 's'} archived (a backup file was also downloaded).`);
+  };
+
+  const handleRestore = () => {
+    if (!confirm('Bring back all archived revisions and turn off the fresh start?')) return;
+    const n = restoreArchivedRevisions();
+    setNotice(`${n} archived revision${n === 1 ? '' : 's'} restored.`);
+  };
+
+  const pendingNow = revisions.filter(r => r.status !== 'Completed').length;
 
   const getStatusColor = (status: string) => {
     return status === 'Completed' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-orange-100 text-orange-700 border-orange-200';
@@ -64,6 +95,69 @@ export default function Revisions() {
         </h2>
         <p className="text-sm text-slate-500 mt-1">7-day, 15-day, and 30-day revision cycles - auto-scheduled from Daily Logs.</p>
       </div>
+
+      {/* Fresh start (v1.3) */}
+      {notice && (
+        <div className="mb-4 p-3 rounded-lg border bg-green-50 border-green-200 text-green-800 text-sm flex items-start gap-2">
+          <span className="flex-1">{notice}</span>
+          <button onClick={() => setNotice(null)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
+        </div>
+      )}
+      {settings && (
+        <div className="mb-4 p-3 rounded-lg border bg-blue-50 border-blue-200 text-blue-900 text-sm flex flex-col sm:flex-row sm:items-center gap-2">
+          <RotateCcw className="h-4 w-4 shrink-0" />
+          <span className="flex-1">
+            <strong>Fresh start from {parseDateStr(settings.freshStartFrom).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}.</strong>{' '}
+            Revisions are created only for study logged from that day.
+            {archivedCount > 0 && <> {archivedCount} earlier revision{archivedCount === 1 ? ' is' : 's are'} kept in the archive.</>}
+          </span>
+          {isAdmin && archivedCount > 0 && (
+            <button onClick={handleRestore} className="self-start sm:self-auto text-xs font-semibold bg-white border border-blue-300 hover:bg-blue-100 rounded px-2 py-1 inline-flex items-center gap-1">
+              <Archive className="h-3.5 w-3.5" /> Restore archived
+            </button>
+          )}
+        </div>
+      )}
+      {isAdmin && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={() => { setFreshFrom(addDays(todayStr(), 1)); setShowFreshStart(true); }}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-lg px-3 py-2"
+          >
+            <RotateCcw className="h-4 w-4" /> Fresh start…
+          </button>
+        </div>
+      )}
+      {showFreshStart && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><RotateCcw className="h-5 w-5 text-blue-600" /> Fresh start</h3>
+              <button onClick={() => setShowFreshStart(false)} aria-label="Close"><X className="h-5 w-5 text-slate-400" /></button>
+            </div>
+            <ul className="text-sm text-slate-600 space-y-1.5 mb-4 list-disc pl-5">
+              <li>All <strong>{revisions.length}</strong> current revisions ({pendingNow} pending) move to the <strong>archive</strong> — nothing is deleted, and you can restore them.</li>
+              <li>A backup file of them is downloaded to this computer first.</li>
+              <li>New revisions are created only for study logged <strong>on or after</strong> the date below.</li>
+              <li>Daily logs, study plan and everything else stay exactly as they are.</li>
+            </ul>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Start fresh from</label>
+            <input
+              type="date"
+              value={freshFrom}
+              min={todayStr()}
+              onChange={(e) => setFreshFrom(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white mb-5"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowFreshStart(false)} className="px-4 py-2 text-sm font-semibold border border-slate-300 rounded-lg hover:bg-slate-50">Cancel</button>
+              <button onClick={handleFreshStart} disabled={!freshFrom} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">
+                Archive &amp; start fresh
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50">
@@ -97,7 +191,7 @@ export default function Revisions() {
               {!revisions.length ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-slate-500 text-sm">
-                    No revisions scheduled yet. Add items in the Daily Log to auto-schedule them.
+                    {settings ? `No revisions yet — they'll appear as study is logged from ${parseDateStr(settings.freshStartFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.` : 'No revisions scheduled yet. Add items in the Daily Log to auto-schedule them.'}
                   </td>
                 </tr>
               ) : (

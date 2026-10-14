@@ -23,6 +23,9 @@ export const STORE_KEYS = {
   appreciation: 'dugu_appreciation',
   upcomingEvent: 'dugu_upcoming_event',
   reminders: 'dugu_reminders', // v1.2: per-user study reminder settings
+  revisionSettings: 'dugu_revision_settings', // v1.3: revision "fresh start" settings
+  revisionsArchive: 'dugu_revisions_archive', // v1.3: revisions put aside by a fresh start
+  topicStatus: 'dugu_topic_status', // v1.3: topics marked completed directly by a tutor/admin
 } as const;
 
 /** Every key that StoreSync mirrors starts with this prefix. */

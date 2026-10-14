@@ -38,6 +38,8 @@ As a Teacher, your primary role is to manage the study plan, evaluate students, 
 - **Study Materials & Flashcards:**
   - Go to **Flashcards** to create flashcards and quizzes for chapters or topics.
   - Access **Study Notes** and **Team Notes** to share important information and collaborative materials with students.
+- **Marking topics completed:**
+  - On the **Syllabus** page, use **Mark topics completed** to tick off everything already covered in class (you can tick whole chapters or all Term-1 chapters at once), or use **✓ Mark completed** on a single topic. **Unmark** undoes it.
 - **Syllabus Navigation:**
   - In the **Syllabus** view, you can see all topics and subtopics.
   - You'll find quick links to Flashcards/Quizzes and view the Activity Log associated with each topic.

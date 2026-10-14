@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2, Download, Layers, Clock, PlayCircle } from 'lucide-react';
+import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2, Download, Layers, Clock, PlayCircle, ListChecks, Undo2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { todayStr } from '../lib/dates';
+import { todayStr, parseDateStr } from '../lib/dates';
+import { STORE_KEYS, readStore } from '../lib/storeKeys';
+import { makeTopicStatusLookup, saveTopicMarks, TopicMark } from '../lib/topicStatus';
+import TopicCompletionModal from '../components/TopicCompletionModal';
 
 interface SubTopic {
   id: string;
@@ -67,12 +70,29 @@ export default function Syllabus() {
   const [importSuccess, setImportSuccess] = useState(false);
   const [dailyLogs, setDailyLogs] = useState<any[]>([]);
 
-  const getTopicStatus = (topicId: string) => {
-    const logs = dailyLogs.filter(l => l.topicId === topicId);
-    if (logs.length === 0) return 'Pending';
-    if (logs.some(l => l.status === 'Completed')) return 'Completed';
-    return 'In Progress';
+  // v1.3: tutor/admin "completed" marks + study plan feed the status too
+  // (see src/lib/topicStatus.ts). Marks win over log-based status.
+  const [topicMarks, setTopicMarks] = useState<TopicMark[]>([]);
+  const [studyPlan, setStudyPlan] = useState<any[]>([]);
+  const [showMarkModal, setShowMarkModal] = useState(false);
+  const [markNotice, setMarkNotice] = useState<string | null>(null);
+  const statusLookup = React.useMemo(
+    () => makeTopicStatusLookup(dailyLogs, studyPlan, topicMarks),
+    [dailyLogs, studyPlan, topicMarks],
+  );
+  const getTopicStatus = (topicId: string) => statusLookup.status(topicId);
+  const markedByName = currentUser?.username || currentUser?.email || 'Tutor';
+
+  /** Mark one topic (or all topics of a chapter) completed directly. */
+  const markTopicsCompleted = (chapterId: string, topics: { id: string; name: string }[]) => {
+    if (!activeSubject) return;
+    const refs = topics
+      .filter((t) => getTopicStatus(t.id) !== 'Completed')
+      .map((t) => ({ subjectId: activeSubject.id, chapterId, topicId: t.id, topicName: t.name }));
+    if (refs.length === 0) return;
+    saveTopicMarks(refs, [], { by: markedByName, completedOn: todayStr(), note: 'Covered in class' });
   };
+  const unmarkTopic = (topicId: string) => saveTopicMarks([], [topicId]);
 
   const getChapterStatus = (chapter: Chapter) => {
     if (!chapter.topics.length) return 'Pending';
@@ -112,6 +132,8 @@ export default function Syllabus() {
 
     const savedLogs = localStorage.getItem('dugu_daily_logs');
     if (savedLogs) setDailyLogs(JSON.parse(savedLogs));
+    setTopicMarks(readStore<TopicMark[]>(STORE_KEYS.topicStatus, []));
+    setStudyPlan(readStore<any[]>(STORE_KEYS.studyPlan, []));
       };
     load();
     window.addEventListener('cloud_sync_update', load);
@@ -507,7 +529,14 @@ export default function Syllabus() {
             </div>
           </div>
           {!isStudent && activeSubject && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowMarkModal(true)}
+                className="px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
+                title="Tick off topics already covered (e.g. before the mid-term)"
+              >
+                <ListChecks className="h-4 w-4" /> Mark topics completed
+              </button>
               <button 
                 onClick={() => {
                   if(activeSubject) {
@@ -529,6 +558,24 @@ export default function Syllabus() {
             </div>
           )}
         </div>
+
+        {markNotice && (
+          <div className="mx-4 sm:mx-6 mt-4 p-3 rounded-lg border bg-emerald-50 border-emerald-200 text-emerald-800 text-sm flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            <span className="flex-1">{markNotice}</span>
+            <button onClick={() => setMarkNotice(null)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
+          </div>
+        )}
+        {showMarkModal && activeSubject && (
+          <TopicCompletionModal
+            subject={activeSubject}
+            statusOf={getTopicStatus}
+            isMarked={(id) => !!statusLookup.mark(id)}
+            markedBy={markedByName}
+            onClose={() => setShowMarkModal(false)}
+            onSaved={(msg) => { setShowMarkModal(false); setMarkNotice(msg); }}
+          />
+        )}
 
         {/* Tree View */}
         <div className="p-4 sm:p-6">
@@ -553,6 +600,16 @@ export default function Syllabus() {
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       {!isStudent && (
                         <>
+                          {chapter.topics.length > 0 && getChapterStatus(chapter) !== 'Completed' && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Mark all ${chapter.topics.length} topics in "${chapter.name}" as completed?`)) markTopicsCompleted(chapter.id, chapter.topics);
+                              }}
+                              className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2 py-1 rounded"
+                            >
+                              ✓ Mark chapter completed
+                            </button>
+                          )}
                           <button onClick={() => setShowAddNode({ type: 'topic', parentId: chapter.id })} className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded">
                             + Topic
                           </button>
@@ -606,7 +663,40 @@ export default function Syllabus() {
                               <span className="font-semibold text-slate-700 text-sm">{topic.name}</span>
                               <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full ml-2">Topic</span>
                               <StatusBadge status={getTopicStatus(topic.id)} />
+                              {(() => {
+                                const mark = statusLookup.mark(topic.id);
+                                if (!mark) return null;
+                                return (
+                                  <span className="text-[10px] text-emerald-700 hidden sm:inline" title={mark.note || ''}>
+                                    marked by {mark.markedBy || 'tutor'} · {parseDateStr(mark.completedOn).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                  </span>
+                                );
+                              })()}
                             </div>
+                            {!isStudent && (() => {
+                              const mark = statusLookup.mark(topic.id);
+                              if (mark) {
+                                return (
+                                  <button
+                                    onClick={() => unmarkTopic(topic.id)}
+                                    className="mr-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800 px-2 py-1 rounded inline-flex items-center gap-1"
+                                    title="Remove the tutor mark (status goes back to what the Daily Log shows)"
+                                  >
+                                    <Undo2 className="h-3 w-3" /> Unmark
+                                  </button>
+                                );
+                              }
+                              if (getTopicStatus(topic.id) === 'Completed') return null;
+                              return (
+                                <button
+                                  onClick={() => markTopicsCompleted(chapter.id, [topic])}
+                                  className="mr-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded"
+                                  title="Mark this topic completed"
+                                >
+                                  ✓ Mark completed
+                                </button>
+                              );
+                            })()}
                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               {!isStudent && (
                                 <>
