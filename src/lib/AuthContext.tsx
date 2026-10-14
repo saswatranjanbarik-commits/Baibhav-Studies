@@ -15,6 +15,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, signInWithEmailAndPassword, logoutAuth } from './firebase';
 import { PRIMARY_ADMIN_EMAIL } from '../config/app';
+import { markOffline } from './presence';
 
 export interface AppUser {
   id: string;
@@ -128,6 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      // Mark offline first: once signed out, the database refuses writes.
+      await markOffline(currentUser);
       await logoutAuth();
     } catch (error) {
       console.error('Logout failed:', error);

@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Target, Plus, X, Search, Filter, Layers, CheckCircle2, ChevronRight, ChevronLeft, Trash2, Upload, Download } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { todayStr } from '../lib/dates';
+import LearningTree, { SessionFilter } from '../components/LearningTree';
+import { buildLearningTree } from '../lib/learningTree';
 
 type ItemType = 'flashcard' | 'quiz';
 
@@ -207,14 +209,20 @@ export default function Flashcards() {
     }
   };
 
-  const startSession = (type: ItemType) => {
+  /**
+   * Start a flashcard or quiz session.
+   * `filter` (from the Subject/Chapter/Topic tree) narrows it down; without it
+   * the Subject/Chapter dropdowns are used.
+   */
+  const startSession = (type: ItemType, filter?: SessionFilter) => {
+    const subjectId = filter ? filter.subjectId : practiceSubjectId;
+    const chapterId = filter ? filter.chapterId : practiceChapterId;
+    const topicId = filter?.topicId;
     let sessionItems = items.filter(i => i.type === type);
-    if (practiceSubjectId) {
-      sessionItems = sessionItems.filter(i => i.subjectId === practiceSubjectId);
-    }
-    if (practiceChapterId) {
-      sessionItems = sessionItems.filter(i => i.chapterId === practiceChapterId);
-    }
+    if (subjectId) sessionItems = sessionItems.filter(i => String(i.subjectId) === String(subjectId));
+    if (chapterId) sessionItems = sessionItems.filter(i => String(i.chapterId) === String(chapterId));
+    if (topicId) sessionItems = sessionItems.filter(i => String(i.topicId) === String(topicId));
+    if (sessionItems.length === 0) return;
     // In a real app, we might filter by subject/chapter here if requested
     // Shuffle the items for practice
     const shuffled = [...sessionItems].sort(() => 0.5 - Math.random());
@@ -307,6 +315,29 @@ export default function Flashcards() {
     });
   };
 
+  // ---- Subject → Chapter → Topic tree (v1.2) ---------------------------
+  // Links from the Syllabus page arrive as ?subjectId=…&chapterId=…&topicId=…&action=play-flashcard|play-quiz
+  const linkFilter: SessionFilter = {
+    subjectId: searchParams.get('subjectId') || undefined,
+    chapterId: searchParams.get('chapterId') || undefined,
+    topicId: searchParams.get('topicId') || undefined,
+  };
+  const linkHandled = useRef(false);
+  useEffect(() => {
+    if (linkHandled.current || items.length === 0) return;
+    const action = searchParams.get('action');
+    if (action === 'play-flashcard' || action === 'play-quiz') {
+      linkHandled.current = true;
+      startSession(action === 'play-flashcard' ? 'flashcard' : 'quiz', linkFilter);
+    }
+  }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** "+ Card" / "+ Quiz" on a topic: open the add form with the topic pre-selected. */
+  const handleAddToTopic = (type: ItemType, path: Required<SessionFilter>) => {
+    setNewItem({ subjectId: path.subjectId, chapterId: path.chapterId, topicId: path.topicId, options: ['', '', '', ''], correctOptionIndex: 0 });
+    setShowAddModal(type);
+  };
+
   const filteredItems = items.filter(i => 
     (i.subjectName && i.subjectName.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (i.chapterName && i.chapterName.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -314,6 +345,16 @@ export default function Flashcards() {
     (i.front && i.front.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (i.question && i.question.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  const isSearching = searchQuery.trim() !== '';
+  const manageTree = useMemo(
+    () => buildLearningTree(syllabus, filteredItems, { includeEmpty: !isSearching }),
+    [syllabus, filteredItems, isSearching],
+  );
+  const practiceTree = useMemo(() => {
+    const type: ItemType = activeTab === 'quiz' ? 'quiz' : 'flashcard';
+    return buildLearningTree(syllabus, items.filter(i => i.type === type), { includeEmpty: false });
+  }, [syllabus, items, activeTab]);
 
   return (
     <div className="max-w-7xl mx-auto pb-12">
@@ -391,57 +432,29 @@ export default function Flashcards() {
               </div>
             </div>
 
-            {!filteredItems.length ? (
+            {items.length > 0 && !filteredItems.length ? (
               <div className="py-12 text-center">
                 <Layers className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-slate-700">No content found</h3>
-                <p className="text-slate-500 text-sm mt-1">Add flashcards and quiz questions to get started.</p>
+                <h3 className="text-lg font-bold text-slate-700">No content matches "{searchQuery}"</h3>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredItems.map(item => (
-                  <div key={item.id} className="border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow relative group bg-white">
-                    <button 
-                      onClick={() => handleDelete(item.id)}
-                      className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                    
-                    <div className="mb-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${
-                        item.type === 'flashcard' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-red-50 text-red-700 border-red-200'
-                      }`}>
-                        {item.type}
-                      </span>
-                    </div>
-                    
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      {item.subjectName} &middot; {item.chapterName}
-                    </div>
-                    <div className="text-sm font-semibold text-slate-900 mb-3">{item.topicName}</div>
-                    
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-700 line-clamp-3">
-                      {item.type === 'flashcard' ? (
-                        <>
-                          <span className="font-semibold">Q:</span> {item.front}
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-semibold">Q:</span> {item.question}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              // Grouped by Subject → Chapter → Topic. Click a topic to see its items.
+              <LearningTree
+                tree={manageTree}
+                mode="manage"
+                expandAll={isSearching}
+                initiallyOpen={linkFilter}
+                onAdd={handleAddToTopic}
+                onDelete={handleDelete}
+                onStart={(type, filter) => startSession(type, filter)}
+              />
             )}
           </div>
         )}
 
         {/* Practice Sessions */}
         {(activeTab === 'flashcards' || activeTab === 'quiz') && !practiceSession && (
-          <div className="p-12 flex flex-col items-center justify-center text-center min-h-[400px]">
+          <div className="p-6 sm:p-12 flex flex-col items-center justify-center text-center min-h-[400px]">
             <div className={`p-4 rounded-full mb-4 ${activeTab === 'flashcards' ? 'bg-indigo-50 text-indigo-600' : 'bg-red-50 text-red-600'}`}>
               <Target className="h-10 w-10" />
             </div>
@@ -486,6 +499,22 @@ export default function Flashcards() {
             </button>
             {items.filter(i => i.type === (activeTab === 'flashcards' ? 'flashcard' : 'quiz') && (!practiceSubjectId || i.subjectId === practiceSubjectId) && (!practiceChapterId || i.chapterId === practiceChapterId)).length === 0 && (
               <p className="text-sm text-red-500 mt-3 font-medium">No items available for this selection.</p>
+            )}
+
+            {/* Pick a specific subject, chapter or topic (v1.2) */}
+            {practiceTree.length > 0 && (
+              <div className="w-full max-w-3xl mt-10 text-left">
+                <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">
+                  Or choose a subject, chapter or topic
+                </h4>
+                <LearningTree
+                  tree={practiceTree}
+                  mode="practice"
+                  practiceType={activeTab === 'quiz' ? 'quiz' : 'flashcard'}
+                  initiallyOpen={linkFilter}
+                  onStart={(type, filter) => startSession(type, filter)}
+                />
+              </div>
             )}
           </div>
         )}

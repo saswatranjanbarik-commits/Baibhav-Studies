@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PenTool, Plus, X, Search, Filter, Clock } from 'lucide-react';
 import { todayStr } from '../lib/dates';
+import ReminderSettingsCard from '../components/ReminderSettingsCard';
 
 type PlanType = 'Teaching' | 'Self Study' | 'Quiz' | 'Flashcard' | 'Task' | 'Assessment';
 
@@ -126,6 +127,9 @@ export default function StudyPlan() {
           <Plus className="h-4 w-4" /> Add Plan Target
         </button>
       </div>
+
+      {/* Daily reminder notifications (v1.2) */}
+      <ReminderSettingsCard planEntries={entries} />
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-4 bg-slate-50">

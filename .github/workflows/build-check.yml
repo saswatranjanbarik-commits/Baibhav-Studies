@@ -1,0 +1,27 @@
+# Build check — runs automatically on GitHub (free) every time code is pushed.
+#
+# It installs the packages and runs the same `npm run build` that Vercel runs,
+# so a broken change shows a red ✗ on GitHub before it ever reaches the live site.
+# You can see results under the repo's "Actions" tab, or as a ✓ / ✗ next to
+# each commit and pull request.
+name: Build check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install packages
+        run: npm ci || npm install
+      - name: Build (same as Vercel)
+        run: npm run build

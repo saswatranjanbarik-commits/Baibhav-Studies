@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { useTeamUsers } from '../lib/useTeamUsers';
+import TeamOnline from '../components/TeamOnline';
 import { STORE_KEYS } from '../lib/storeKeys';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Star, BarChart3, CheckCircle2, Clock, Calendar as CalendarIcon, RefreshCw, Trophy, Target, Sparkles, Globe2, Edit3, X } from 'lucide-react';
@@ -19,8 +19,6 @@ export default function Dashboard() {
   const [overallProgress, setOverallProgress] = React.useState(0);
   const [recentTopics, setRecentTopics] = React.useState<any[]>([]);
   const [subjectProgress, setSubjectProgress] = React.useState<any[]>([]);
-  // Loaded once per visit (used to be re-downloaded after every save).
-  const teamUsers = useTeamUsers();
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -298,40 +296,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Team Online */}
-      <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm mb-6">
-        <h3 className="text-[15px] font-bold text-slate-900 mb-3 flex items-center gap-2">
-          <Globe2 className="h-4 w-4 text-blue-500" /> Team Online Now
-        </h3>
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {teamUsers.length > 0 ? (
-            teamUsers.map((user: any, i: number) => (
-              <div key={user.id || i} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                  <div>
-                    <div className="text-sm font-bold text-slate-900">{user.username || 'User'}</div>
-                    <div className="text-xs text-slate-500">{user.timezone || 'Timezone'}</div>
-                  </div>
-                </div>
-                <div className="text-[10px] font-bold text-indigo-600 px-2 py-1 bg-indigo-50 rounded">
-                  {user.role}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <div>
-                  <div className="text-sm font-bold text-slate-900">{currentUser?.username || 'User'}</div>
-                  <div className="text-xs text-slate-500">{currentUser?.timezone || 'Timezone'}</div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Team Online — only people currently logged in */}
+      <TeamOnline />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Subject Progress */}
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
