@@ -15,6 +15,7 @@ import {
   Users,
   ClipboardList,
   Star,
+  Database,
   X
 } from 'lucide-react';
 
@@ -32,6 +33,7 @@ const navigation = [
   { name: 'Calendar', href: '/calendar', icon: Calendar, color: 'text-red-400', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Timetable', href: '/timetable', icon: Clock, color: 'text-red-400', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Manage Users', href: '/users', icon: Users, color: 'text-blue-600', roles: ['Admin'] },
+  { name: 'Backup', href: '/backup', icon: Database, color: 'text-emerald-600', roles: ['Admin'] },
 ];
 
 interface SidebarProps {

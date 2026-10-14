@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Search, Filter, CheckCircle } from 'lucide-react';
+import { parseDateStr } from '../lib/dates';
 
 interface RevisionEntry {
   id: string;
@@ -52,7 +53,7 @@ export default function Revisions() {
 
   const isOverdue = (date: string, status: string) => {
     if (status === 'Completed') return false;
-    return new Date(date).getTime() < new Date().setHours(0,0,0,0);
+    return parseDateStr(date).getTime() < new Date().setHours(0,0,0,0);
   };
 
   return (

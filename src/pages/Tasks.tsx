@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckSquare, Plus, Search, Filter, CheckCircle2, Circle, Calendar, Trash2, X, AlertCircle, Tag, Clock, Link as LinkIcon, FileText, Upload } from 'lucide-react';
+import { todayStr, parseDateStr } from '../lib/dates';
 
 interface Task {
   id: string;
@@ -37,7 +38,7 @@ export default function Tasks() {
     priority: 'Medium',
     status: 'Pending',
     category: 'General',
-    dueDate: new Date().toISOString().split('T')[0],
+    dueDate: todayStr(),
     subjectId: '',
     chapterId: '',
     topicId: '',
@@ -75,7 +76,7 @@ export default function Tasks() {
       id: Date.now().toString(),
       title: newTask.title,
       description: newTask.description || '',
-      dueDate: newTask.dueDate || new Date().toISOString().split('T')[0],
+      dueDate: newTask.dueDate || todayStr(),
       priority: newTask.priority as any,
       status: newTask.status as any,
       category: newTask.category as any,
@@ -102,7 +103,7 @@ export default function Tasks() {
       priority: 'Medium',
       status: 'Pending',
       category: 'General',
-      dueDate: new Date().toISOString().split('T')[0],
+      dueDate: todayStr(),
       subjectId: '',
       chapterId: '',
       topicId: '',
@@ -186,7 +187,7 @@ export default function Tasks() {
 
   const isOverdue = (dueDate: string, status: string) => {
     if (status === 'Completed') return false;
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayStr();
     return dueDate < today;
   };
 
@@ -399,7 +400,7 @@ export default function Tasks() {
                                 <Calendar className="h-3.5 w-3.5" />
                               )}
                               {task.status === 'Completed' ? 'Completed' : (isOverdue(task.dueDate, task.status) ? 'Overdue: ' : 'Due: ')}
-                              {new Date(task.dueDate).toLocaleDateString()}
+                              {parseDateStr(task.dueDate).toLocaleDateString()}
                             </div>
                           </div>
                         </div>

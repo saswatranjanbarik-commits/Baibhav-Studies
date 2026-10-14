@@ -1,8 +1,61 @@
 rules_version = '2';
+
+// ---------------------------------------------------------------------------
+// Dugu EduTrack — Firestore security rules
+//
+// These are NOT deployed by Vercel. Paste this file into:
+//   Firebase Console → (project) → Firestore Database → Rules → Publish
+//
+// Who can do what:
+//   • Only REGISTERED accounts (a document exists at users/{their email}) or
+//     the primary admin can read or write anything.
+//   • Only Admins can create, edit or delete user profiles.
+//   • Any registered user can read/write the shared study data (appStore),
+//     exactly as before.
+//
+// Previously ANY signed-in account could read and write everything, and the
+// login page let anyone create an account.
+// ---------------------------------------------------------------------------
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
     }
+
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    // Keep in sync with PRIMARY_ADMIN_EMAIL in src/config/app.ts
+    function isPrimaryAdmin() {
+      return signedIn() && myEmail() == 'saswatranjanbarik@gmail.com';
+    }
+
+    function myProfilePath() {
+      return /databases/$(database)/documents/users/$(myEmail());
+    }
+
+    function isRegistered() {
+      return signedIn() && (isPrimaryAdmin() || exists(myProfilePath()));
+    }
+
+    function isAdmin() {
+      return isPrimaryAdmin()
+        || (isRegistered() && get(myProfilePath()).data.role == 'Admin');
+    }
+
+    // User profiles: users/{lower-case email}
+    match /users/{email} {
+      allow read: if isRegistered();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Shared study data: appStore/global_store
+    match /appStore/{docId} {
+      allow read, write: if isRegistered();
+    }
+
+    // Everything else is closed by default.
   }
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Star, Award, TrendingUp, ThumbsUp, Plus, X } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import { todayStr } from '../lib/dates';
 
 interface AppreciationRecord {
   id: string;
@@ -43,7 +44,7 @@ export default function Appreciation() {
 
     const record: AppreciationRecord = {
       id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
+      date: todayStr(),
       points: Number(newRecord.points),
       reason: newRecord.reason,
       teacherId: currentUser?.id || 'unknown',

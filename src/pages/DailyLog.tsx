@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ClipboardList, Plus, X, Search, Filter, Calendar, Clock, BookOpen, RefreshCw, ChevronLeft, ChevronRight, CheckCircle, Activity, Gamepad2, UserCircle, Users, Trash2, GraduationCap } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import { useTeamUsers } from '../lib/useTeamUsers';
+import { todayStr, toDateStr, parseDateStr, addDays } from '../lib/dates';
 
 type LogType = 'School' | 'Tutor' | 'Self Study' | 'Play' | 'Activity';
 type Category = 'Rock' | 'Sand' | 'Pebble';
@@ -56,16 +58,17 @@ export default function DailyLog() {
   const [timetable, setTimetable] = useState<any[]>([]);
   const [revisions, setRevisions] = useState<RevisionEntry[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
-  const [teachers, setTeachers] = useState<any[]>([]);
+  // Teachers for the "Teacher / Tutor" dropdown, from the users collection.
+  const teachers = useTeamUsers().filter(u => u.role === 'Teacher');
   
   const [newLog, setNewLog] = useState<Partial<DailyLogEntry>>({
     logType: 'Self Study',
     category: 'Rock',
-    date: new Date().toISOString().split('T')[0],
+    date: todayStr(),
     status: 'In Progress'
   });
 
-  const [activeDate, setActiveDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [activeDate, setActiveDate] = useState<string>(todayStr());
 
   useEffect(() => {
     const load = () => {
@@ -79,12 +82,7 @@ export default function DailyLog() {
     if (savedTimetable) setTimetable(JSON.parse(savedTimetable));
     const savedRevisions = localStorage.getItem('dugu_revisions');
     if (savedRevisions) setRevisions(JSON.parse(savedRevisions));
-    
-    const savedUsers = localStorage.getItem('dugu_users_v2');
-    if (savedUsers) {
-      const users = JSON.parse(savedUsers);
-      setTeachers(users.filter((u: any) => u.role === 'Teacher'));
-    }
+
       };
     load();
     window.addEventListener('cloud_sync_update', load);
@@ -114,7 +112,7 @@ export default function DailyLog() {
     const savedRevisions = localStorage.getItem('dugu_revisions');
     let savedRevs: RevisionEntry[] = savedRevisions ? JSON.parse(savedRevisions) : [];
     
-    const logDate = new Date(log.date);
+    const logDate = parseDateStr(log.date);
     
     const createRevision = (days: number, type: '7 Day' | '15 Day' | '30 Day'): RevisionEntry => {
       const d = new Date(logDate);
@@ -122,7 +120,7 @@ export default function DailyLog() {
       return {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
         logId: log.id,
-        dateScheduled: d.toISOString().split('T')[0],
+        dateScheduled: toDateStr(d),
         type,
         subjectName: log.subjectName || '',
         chapterName: log.chapterName || '',
@@ -177,7 +175,7 @@ export default function DailyLog() {
     
     const log: DailyLogEntry = {
       id: Date.now().toString(),
-      date: newLog.date || new Date().toISOString().split('T')[0],
+      date: newLog.date || todayStr(),
       logType: newLog.logType || 'Self Study',
       category: newLog.category || 'Rock',
       timeFrom: newLog.timeFrom,
@@ -245,7 +243,7 @@ export default function DailyLog() {
     setNewLog({ 
       logType: 'Self Study', 
       category: 'Rock', 
-      date: new Date().toISOString().split('T')[0],
+      date: todayStr(),
       status: 'In Progress' 
     });
   };
@@ -268,7 +266,7 @@ export default function DailyLog() {
 
   const filteredLogs = logs.filter(l => l.date === activeDate).sort((a, b) => (a.timeFrom || '').localeCompare(b.timeFrom || ''));
 
-  const activeDayOfWeek = new Date(activeDate).toLocaleDateString('en-US', { weekday: 'long' });
+  const activeDayOfWeek = parseDateStr(activeDate).toLocaleDateString('en-US', { weekday: 'long' });
   const todaysTimetable = timetable.filter(t => t.day === activeDayOfWeek).sort((a,b) => a.period.localeCompare(b.period));
 
   const getTypeIcon = (type: string | undefined) => {
@@ -365,9 +363,7 @@ export default function DailyLog() {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button 
                 onClick={() => {
-                  const d = new Date(activeDate);
-                  d.setDate(d.getDate() - 1);
-                  setActiveDate(d.toISOString().split('T')[0]);
+                  setActiveDate(addDays(activeDate, -1));
                 }}
                 className="p-1.5 hover:bg-slate-200 rounded-md text-slate-600"
               >
@@ -381,9 +377,7 @@ export default function DailyLog() {
               />
               <button 
                 onClick={() => {
-                  const d = new Date(activeDate);
-                  d.setDate(d.getDate() + 1);
-                  setActiveDate(d.toISOString().split('T')[0]);
+                  setActiveDate(addDays(activeDate, 1));
                 }}
                 className="p-1.5 hover:bg-slate-200 rounded-md text-slate-600"
               >
@@ -392,7 +386,7 @@ export default function DailyLog() {
             </div>
             
             <button 
-              onClick={() => setActiveDate(new Date().toISOString().split('T')[0])}
+              onClick={() => setActiveDate(todayStr())}
               className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-lg w-full sm:w-auto text-center"
             >
               Today
@@ -646,7 +640,7 @@ export default function DailyLog() {
                   >
                     <option value="">-- Select Teacher --</option>
                     {teachers.map(t => (
-                      <option key={t.id} value={t.username}>{t.username}</option>
+                      <option key={t.email} value={t.username}>{t.username}</option>
                     ))}
                   </select>
                 </div>

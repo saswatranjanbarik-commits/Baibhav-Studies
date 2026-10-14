@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Paperclip, Plus, X, Search, Filter, ExternalLink, FileText, File as FileIcon, Link as LinkIcon, FileImage } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import { todayStr } from '../lib/dates';
 
 interface StudyNote {
   id: string;
@@ -71,7 +72,7 @@ export default function StudyNotes() {
       title: newNote.title,
       type: newNote.type || 'Link',
       link: newNote.link,
-      dateAdded: new Date().toISOString().split('T')[0]
+      dateAdded: todayStr()
     };
 
     saveNotes([note, ...notes]);

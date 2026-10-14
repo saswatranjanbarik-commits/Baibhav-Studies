@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, X, Search, Edit2, Trash2, Globe, Shield, User, Mail, AlertTriangle } from 'lucide-react';
-import { collection, doc, getDocs, setDoc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
 import { db, secondaryAuth, createUserWithEmailAndPassword } from '../lib/firebase';
-import { AppUser } from '../lib/AuthContext';
+import { AppUser, isPrimaryAdmin } from '../lib/AuthContext';
 
 const TIMEZONES = [
   "UTC-12:00 (International Date Line West)",
@@ -86,10 +86,20 @@ export default function ManageUsers() {
         }
         try {
           await createUserWithEmailAndPassword(secondaryAuth, email, newUser.password);
+          // The secondary app is now signed in as the new user; sign it out
+          // again so it doesn't linger. (The admin's own session is untouched.)
+          await secondaryAuth.signOut().catch(() => {});
         } catch (authError: any) {
-          console.error("Auth creation error:", authError);
-          alert(authError.message || "Failed to create user authentication. Email might already be in use.");
-          return;
+          if (authError?.code === 'auth/email-already-in-use') {
+            // The login already exists (e.g. the user was removed earlier and is
+            // being re-added). Just recreate their profile to restore access;
+            // their existing password keeps working.
+            alert("This email already has a login. Their access will be restored with their existing password.");
+          } else {
+            console.error("Auth creation error:", authError);
+            alert(authError.message || "Failed to create user login.");
+            return;
+          }
         }
       }
 
@@ -115,7 +125,7 @@ export default function ManageUsers() {
   };
 
   const handleDelete = async (user: any) => {
-    if (user.email === 'saswatranjanbarik@gmail.com') {
+    if (isPrimaryAdmin(user.email)) {
       alert("Cannot delete the primary Admin account.");
       return;
     }
@@ -248,11 +258,11 @@ export default function ManageUsers() {
                       <button 
                         onClick={() => handleDelete(user)}
                         className={`p-2 rounded-lg transition-colors ${
-                          user.email === 'saswatranjanbarik@gmail.com' 
+                          isPrimaryAdmin(user.email) 
                             ? 'text-slate-300 cursor-not-allowed' 
                             : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
                         }`}
-                        disabled={user.email === 'saswatranjanbarik@gmail.com'}
+                        disabled={isPrimaryAdmin(user.email)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -349,7 +359,7 @@ export default function ManageUsers() {
                   value={newUser.role || 'Student'}
                   onChange={e => setNewUser({...newUser, role: e.target.value as any})}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
-                  disabled={editingUser?.email === 'saswatranjanbarik@gmail.com'}
+                  disabled={isPrimaryAdmin(editingUser?.email)}
                 >
                   <option value="Admin">Admin</option>
                   <option value="Teacher">Teacher</option>

@@ -13,6 +13,10 @@ As an Admin, you have full control over the application. You can manage users, o
 - **User Management:**
   - Navigate to the **Manage Users** page to add, edit, or remove users (Teachers and Students).
   - Assign roles and reset passwords if necessary.
+  - There is no public sign-up: every person must be added here before they can log in.
+- **Backup:**
+  - Open the **Backup** page and download a backup regularly (e.g. weekly).
+  - "Restore missing items" puts back any records that disappeared, without changing existing data.
 - **Syllabus & Curriculum:**
   - In the **Syllabus** section, you can add subjects, chapters, topics, and subtopics.
   - You can also upload a predefined syllabus via CSV.

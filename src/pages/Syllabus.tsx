@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Book, Plus, X, Search, ChevronDown, ChevronRight, Trash2, Pencil, Upload, CheckCircle2, Download, Layers, Clock, PlayCircle } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import { todayStr } from '../lib/dates';
 
 interface SubTopic {
   id: string;
@@ -311,7 +312,7 @@ export default function Syllabus() {
       const parts = line.split(",").map(s => s.trim().replace(/^"|"$/g, ""));
       if (parts.length < 5) continue;
       
-      const startDate = parts[0] || new Date().toISOString().split("T")[0];
+      const startDate = parts[0] || todayStr();
       const weekNo = parts[1] || "1";
       const subjectName = parts[2] || "Unknown Subject";
       const planType = parts[3] || "Self Study";

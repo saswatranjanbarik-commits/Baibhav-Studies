@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, X, Clock, Tag, MapPin, Trash2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import { todayStr, parseDateStr } from '../lib/dates';
 
 interface Event {
   id: string;
@@ -174,7 +175,7 @@ export default function Calendar() {
 
   const monthLogs = dailyLogs.filter(l => {
     if (!l.date) return false;
-    const d = new Date(l.date);
+    const d = parseDateStr(l.date);
     return d.getFullYear() === currentDate.getFullYear() && d.getMonth() === currentDate.getMonth();
   });
 
@@ -240,7 +241,7 @@ export default function Calendar() {
             }
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const { dayEvents, dayTasks, dayLogs } = getEventsForDate(dateStr);
-            const isToday = new Date().toISOString().split('T')[0] === dateStr;
+            const isToday = todayStr() === dateStr;
 
             return (
               <div 
@@ -340,7 +341,7 @@ export default function Calendar() {
         {!isStudent && (
           <button
             onClick={() => {
-              setNewEvent({ ...newEvent, date: new Date().toISOString().split('T')[0] });
+              setNewEvent({ ...newEvent, date: todayStr() });
               setShowAddModal(true);
             }}
             className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2"
