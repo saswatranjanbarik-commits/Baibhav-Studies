@@ -32,6 +32,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Remember this login on this device (untick on shared computers).
+  const [keepSignedIn, setKeepSignedIn] = useState(true);
 
   const navigate = useNavigate();
   const { login, currentUser, authError } = useAuth();
@@ -50,7 +52,7 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, keepSignedIn);
     } catch (err: any) {
       setError(friendlyAuthError(err));
       console.error(err);
@@ -114,6 +116,17 @@ export default function Login() {
                 />
               </div>
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={keepSignedIn}
+                onChange={(e) => setKeepSignedIn(e.target.checked)}
+                className="h-4 w-4 accent-indigo-600"
+              />
+              Keep me signed in on this device
+              <span className="text-xs text-slate-400">(untick on shared computers)</span>
+            </label>
 
             <div className="pt-2">
               <button

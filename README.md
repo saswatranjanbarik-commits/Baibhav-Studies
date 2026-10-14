@@ -21,6 +21,10 @@ npm run build    # production build into /dist (what Vercel runs)
 | `src/lib/firebase.ts` | Firebase connection |
 | `src/lib/AuthContext.tsx` | Login, roles, blocks unregistered accounts |
 | `src/components/StoreSync.tsx` | Syncs study data between localStorage and Firestore |
+| `src/lib/syncMerge.ts` / `syncQueue.ts` | Merge rules; durable queue of unsaved (offline) changes |
+| `src/lib/studyStats.ts` | Streaks, badges, weekly report calculations |
+| `src/pages/WeeklyReport.tsx` | Weekly progress report (printable) |
+| `public/manifest.webmanifest`, `public/icons/` | Installable app |
 | `src/lib/storeKeys.ts` | **The names of every saved data set — never rename these** |
 | `src/lib/dates.ts` | Local-timezone date helpers (use instead of `toISOString()`) |
 | `src/config/app.ts` | Primary admin email and storage limits |
@@ -31,7 +35,7 @@ npm run build    # production build into /dist (what Vercel runs)
 | `src/lib/reminders.ts` | Study reminder settings, notifications, calendar (.ics) export |
 | `src/components/ReminderScheduler.tsx` | Fires reminders while the app is open |
 | `src/lib/learningTree.ts` | Groups flashcards/quizzes by Subject → Chapter → Topic |
-| `public/sw.js` | Tiny service worker, only for notifications (no caching) |
+| `public/sw.js` | Service worker: notifications + offline (network-first pages, cached build files) |
 | `.github/workflows/build-check.yml` | Free GitHub build check on every push |
 
 ## Data model (do not break)

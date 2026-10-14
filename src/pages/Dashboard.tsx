@@ -1,7 +1,9 @@
 import React from 'react';
 import { useAuth } from '../lib/AuthContext';
 import TeamOnline from '../components/TeamOnline';
+import StreakCard from '../components/StreakCard';
 import { STORE_KEYS } from '../lib/storeKeys';
+import { loadRevisionSettings, isCurrentRevision } from '../lib/revisionReset';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Star, BarChart3, CheckCircle2, Clock, Calendar as CalendarIcon, RefreshCw, Trophy, Target, Sparkles, Globe2, Edit3, X } from 'lucide-react';
 import { todayStr, toDateStr, parseDateStr } from '../lib/dates';
@@ -44,7 +46,8 @@ export default function Dashboard() {
         const today = todayStr();
         // Revisions are saved with `dateScheduled` (older code here looked for a
         // `nextRevisionDate` field that never exists, so this always showed 0).
-        const due = revs.filter((r: any) => {
+        const revSettings = loadRevisionSettings(); // ignore revisions archived by a fresh start
+        const due = revs.filter((r: any) => isCurrentRevision(r, revSettings)).filter((r: any) => {
           const date = r.dateScheduled || r.nextRevisionDate;
           return r.status === 'Pending' && !!date && date <= today;
         });
@@ -295,6 +298,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Study streak & badges (v1.3) */}
+      <StreakCard />
 
       {/* Team Online — only people currently logged in */}
       <TeamOnline />

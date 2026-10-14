@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ClipboardList, Plus, X, Search, Filter, Calendar, Clock, BookOpen, RefreshCw, ChevronLeft, ChevronRight, CheckCircle, Activity, Gamepad2, UserCircle, Users, Trash2, GraduationCap } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useTeamUsers } from '../lib/useTeamUsers';
+import { shouldScheduleRevisions } from '../lib/revisionReset';
 import { todayStr, toDateStr, parseDateStr, addDays } from '../lib/dates';
 
 type LogType = 'School' | 'Tutor' | 'Self Study' | 'Play' | 'Activity';
@@ -109,6 +110,7 @@ export default function DailyLog() {
 
   const scheduleRevisions = (log: DailyLogEntry) => {
     if (log.category !== 'Rock') return; // Only Rock logs need revisions
+    if (!shouldScheduleRevisions(log.date)) return; // before the revision "fresh start" date
     const savedRevisions = localStorage.getItem('dugu_revisions');
     let savedRevs: RevisionEntry[] = savedRevisions ? JSON.parse(savedRevisions) : [];
     

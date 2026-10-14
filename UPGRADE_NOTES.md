@@ -1,3 +1,58 @@
+# Upgrade notes — v1.3 (stay signed in, installable app & offline, streaks, weekly report)
+
+No existing data, collections or field names were changed, and nothing new is
+stored in the cloud except two small revision keys (see below). Firestore
+rules are unchanged from v1.2.
+
+## What's new
+- **Stay signed in** — logins are remembered on the device until "Exit".
+  A "Keep me signed in" box on the login page (untick on shared computers).
+- **Install as an app** — "Install app" (Android/Chrome/Edge) or
+  "Add to Home Screen" instructions (iPhone/iPad) at the bottom of the menu.
+  Opens full-screen with its own icon.
+- **Offline support**
+  - The app opens without internet and shows the data already on the device.
+  - Anything added offline is kept on the device (even if the app is closed)
+    and uploaded automatically, with the usual safe merge, when back online.
+  - Header badge/banner shows "offline" instead of an error.
+- **Streaks & badges** (Dashboard) — current and best study streak, this
+  week's study days, 10 badges. Calculated from the Daily Log.
+- **Weekly Report** (new menu item) — study time per day and per subject,
+  topics completed, doubts to discuss, revisions done/missed, tasks, points,
+  comparison with last week. Browse previous weeks; "Print / PDF".
+- **Revision Planner → Fresh start** (Admin) — archives all current revisions
+  (nothing deleted; a backup file is downloaded too) and creates new revisions
+  only for study logged from a chosen date. "Restore archived" undoes it.
+  New store keys: `dugu_revision_settings`, `dugu_revisions_archive`.
+- **Fix:** the one-time "upload browser-only data" rescue now runs once per
+  device. Before, items deleted on one device could reappear when another
+  device opened the app.
+
+## Notes
+- Study *time* needs "Time from / Time to" on Daily Log entries; entries
+  without times still count as sessions and for streaks.
+- Play/Activity logs and classes marked Teacher Absent/Rescheduled/Canceled
+  don't count towards streaks or study time.
+- A copy of the data is kept on each device for offline use (as before in
+  browser storage, now also in the browser's database). On a shared computer,
+  untick "Keep me signed in".
+
+## New / changed files (v1.3)
+New: src/lib/syncMerge.ts, src/lib/syncQueue.ts, src/lib/studyStats.ts,
+src/lib/useStoredData.ts, src/lib/installApp.ts, src/components/StreakCard.tsx,
+src/components/DayBarChart.tsx, src/components/InstallAppButton.tsx,
+src/pages/WeeklyReport.tsx, src/lib/revisionReset.ts,
+public/manifest.webmanifest, public/favicon.png, public/icons/(4 icons)
+Changed: index.html, public/sw.js, src/main.tsx, src/App.tsx,
+src/components/StoreSync.tsx, src/components/SyncStatusBar.tsx,
+src/components/Layout.tsx, src/components/Sidebar.tsx, src/lib/firebase.ts,
+src/lib/AuthContext.tsx, src/lib/storeKeys.ts, src/pages/Login.tsx,
+src/pages/Dashboard.tsx, src/pages/Revisions.tsx, src/pages/DailyLog.tsx,
+src/components/StreakCard.tsx, src/pages/WeeklyReport.tsx,
+README.md, UPGRADE_NOTES.md
+
+---
+
 # Upgrade notes — v1.2 (clock, team online, reminders, grouped flashcards)
 
 No existing data, collections or field names were changed. New, additive only:

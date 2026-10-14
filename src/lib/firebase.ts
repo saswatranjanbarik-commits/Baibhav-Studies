@@ -12,11 +12,19 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  browserLocalPersistence,
   browserSessionPersistence,
   inMemoryPersistence,
+  setPersistence,
   browserPopupRedirectResolver,
 } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  Firestore,
+} from 'firebase/firestore';
 
 const env = import.meta.env;
 
@@ -32,12 +40,17 @@ const firebaseConfig = {
 // Primary app used for everything.
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Session persistence: closing the browser tab logs the user out.
-// (Switch to browserLocalPersistence to stay signed in across visits.)
+// Stay signed in (v1.3): the login is remembered on this device until "Exit".
+// The login page's "Keep me signed in" box can switch a single login to
+// session-only (ends when the browser is closed) — see rememberLogin().
 export const auth = initializeAuth(app, {
-  persistence: [browserSessionPersistence, inMemoryPersistence],
+  persistence: [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence],
   popupRedirectResolver: browserPopupRedirectResolver,
 });
+
+/** Choose whether the next login is remembered on this device. */
+export const rememberLogin = (keep: boolean) =>
+  setPersistence(auth, keep ? browserLocalPersistence : browserSessionPersistence);
 
 // Secondary app used ONLY by Manage Users, so the admin can create a new
 // login without being signed out of their own session.
@@ -45,7 +58,20 @@ const secondaryApp = getApps().find((a) => a.name === 'SecondaryApp')
   ?? initializeApp(firebaseConfig, 'SecondaryApp');
 export const secondaryAuth = getAuth(secondaryApp);
 
-export const db = getFirestore(app);
+// Offline support (v1.3): keep a copy of the database on this device so the
+// app can open and show data without internet. Falls back to the normal
+// in-memory cache where the browser doesn't allow it (e.g. some private modes).
+function createDb(): Firestore {
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch (e) {
+    console.warn('Offline cache unavailable, using memory cache:', e);
+    return getFirestore(app);
+  }
+}
+export const db = createDb();
 
 export { signInWithEmailAndPassword, createUserWithEmailAndPassword };
 
