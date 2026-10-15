@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Video, ExternalLink, Clock, CheckCircle2, XCircle, User } from 'lucide-react';
+import { Video, ExternalLink, Clock, CheckCircle2, XCircle, User, MessageSquare } from 'lucide-react';
 import { OnlineClass, canJoin, displayStatus, formatClassTime, relativeStart } from '../lib/classes';
 import { getDeviceTimeZone, zoneCity } from '../lib/timezone';
 
@@ -81,6 +81,16 @@ export default function ClassCard({ cls, now, isHost, onComplete, onCancel, comp
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 disabled:bg-slate-300 rounded-lg px-4 py-2"
             >
               {cls.meetingType === 'link' ? <ExternalLink className="h-4 w-4" /> : <Video className="h-4 w-4" />} Join
+            </button>
+          )}
+          {/* v1.5: class board & learning windows — before, during (external-link classes) and after a class */}
+          {cls.status !== 'Cancelled' && !(cls.meetingType !== 'link' && joinable && cls.status === 'Scheduled') && (
+            <button
+              onClick={() => navigate(`/classes/${cls.id}/room`)}
+              title="Questions, comments, notes, flashcards and quiz for this class"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 rounded-lg px-3 py-2"
+            >
+              <MessageSquare className="h-4 w-4" /> Class board
             </button>
           )}
           {isHost && cls.status === 'Scheduled' && now >= new Date(cls.startUtc).getTime() && onComplete && (
