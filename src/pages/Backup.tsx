@@ -24,6 +24,8 @@ interface BackupFile {
   createdAt: string;
   store: Record<string, any>;
   users: Record<string, any>;
+  /** v1.5 (optional): class boards, whiteboard pages and personal class notes, keyed by document id. */
+  classrooms?: Record<string, any>;
 }
 
 export default function Backup() {
@@ -43,12 +45,21 @@ export default function Backup() {
       // Read straight from the server so the backup is never a stale cache.
       const storeSnap = await getDocFromServer(doc(db, STORE_COLLECTION, STORE_DOC_ID));
       const usersSnap = await getDocs(collection(db, 'users'));
+      // v1.5: class boards (appStore/classroom_*), whiteboard pages (appStore/whiteboard_*)
+      // and personal class notes (appStore/mynotes_*)
+      const extraSnap = await getDocs(collection(db, STORE_COLLECTION));
+      const classrooms = Object.fromEntries(
+        extraSnap.docs
+          .filter((d) => /^(classroom_|whiteboard_|mynotes_)/.test(d.id))
+          .map((d) => [d.id, d.data()]),
+      );
 
       const backup: BackupFile = {
         version: 1,
         createdAt: new Date().toISOString(),
         store: storeSnap.exists() ? storeSnap.data() : {},
         users: Object.fromEntries(usersSnap.docs.map((d) => [d.id, d.data()])),
+        classrooms,
       };
 
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });

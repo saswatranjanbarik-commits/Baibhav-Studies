@@ -27,6 +27,7 @@ npm run build    # production build into /dist (what Vercel runs)
 | `public/manifest.webmanifest`, `public/icons/` | Installable app |
 | `src/pages/Classes.tsx`, `src/pages/ClassRoom.tsx` | Online classes: schedule, join (in-app video), complete |
 | `src/lib/classes.ts` | Class records & time-zone handling (`dugu_classes`) |
+| `src/components/classroom/`, `src/lib/classroomLayout.ts`, `src/lib/classChat.ts`, `src/lib/classroomContent.ts`, `src/lib/whiteboard.ts` | v1.5 split-screen class room: resizable windows, live class board, learning window, live whiteboard |
 | `api/video-room.ts` | Vercel server function: private Daily.co room + pass (needs `DAILY_API_KEY`) |
 | `src/lib/storeKeys.ts` | **The names of every saved data set — never rename these** |
 | `src/lib/dates.ts` | Local-timezone date helpers (use instead of `toISOString()`) |
@@ -51,6 +52,10 @@ npm run build    # production build into /dist (what Vercel runs)
   `dugu_learning_items`, `dugu_appreciation`, `dugu_upcoming_event`,
   `dugu_reminders` (v1.2), `dugu_revision_settings`, `dugu_revisions_archive`,
   `dugu_topic_status` (v1.3), `dugu_classes` (v1.4)).
+* `appStore/classroom_<classId>` (v1.5) → the live class board for one class
+  (`messages` map, shared whiteboard page). `appStore/whiteboard_<classId>_<page>`
+  (v1.5) → whiteboard strokes. `appStore/mynotes_<user>` (v1.5) → each person's own class
+  notes. Separate small documents, so they don't use the main 1 MB document.
 
 Pages read/write `localStorage` with these keys; `StoreSync` mirrors them to
 Firestore. New features must **add** keys or **optional** fields — never rename

@@ -42,6 +42,12 @@ As a Teacher, your primary role is to manage the study plan, evaluate students, 
   - Open **Online Classes → Schedule class**. Pick the subject/chapter, type the start in *your* local time, choose the length and whether it repeats weekly. The student sees it in their own time zone.
   - Press **Join** (from 10 minutes before). The video opens inside EduTrack; allow the camera and microphone the first time.
   - After the class press **Leave** (or **Complete**) and tick the topics covered — this adds it to the Daily Log and schedules revisions.
+- **Class room windows (v1.5):**
+  - The class room has four windows: **Video**, **Whiteboard**, **Questions** and **Learning** (the whiteboard starts switched off — press ✎). Use the buttons at the top right to switch each one on or off, and drag the bars between them to resize (double-click a bar to reset; ↺ resets everything). Each device remembers its own layout.
+  - **Questions → Class board** is shared live with the student: read questions, **Reply**, and **Mark answered**. **My notes** is your own notepad for the class (Download saves a copy).
+  - **Learning** shows the study notes, flashcards and quiz for the class topics (change the list to Chapter / Subject / Everything). **Show to class** puts a flashcard or note on the class board; **Ask the class** posts a quiz question that the student answers live — you see their answer.
+  - **Whiteboard:** draw or write with the mouse, finger or stylus — the student sees it within a second and can draw too. Pick a tool (pen, highlighter, line, box, circle, text, eraser), colour and size; **Undo** removes your own last stroke; **+** adds a page (everyone moves to it); the bin clears the page for everyone; the download button saves the page as a picture.
+  - The class board stays with the class: open **Class board** on the class card later to review the questions.
 - **Marking topics completed:**
   - On the **Syllabus** page, use **Mark topics completed** to tick off everything already covered in class (you can tick whole chapters or all Term-1 chapters at once), or use **✓ Mark completed** on a single topic. **Unmark** undoes it.
 - **Syllabus Navigation:**
@@ -71,3 +77,8 @@ As a Student, you can track your study progress, complete tasks, and review mate
 - **Learning Materials:**
   - Click on the **Syllabus** to see what you need to study. Expand chapters/topics to view activity logs and click the link to access Flashcards & Quizzes for that section.
   - Use **Flashcards** and **Study Notes** to revise for your exams.
+- **Online classes:**
+  - Press **Join** on **Online Classes** (from 10 minutes before) and allow the camera and microphone.
+  - In class, type questions or comments in the **Questions** window — your tutor sees them straight away. Use **My notes** for your own notes.
+  - Open notes, flashcards or quiz questions for the lesson in the **Learning** window.
+  - When your tutor uses the **Whiteboard** (✎ button), you can write on it too — e.g. show your working. Download a page to keep it. Switch windows on/off with the buttons at the top, and drag the bars to make a window bigger.
