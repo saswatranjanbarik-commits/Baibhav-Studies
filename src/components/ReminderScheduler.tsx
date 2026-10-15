@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { AlarmClock, X } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { readStore, STORE_KEYS } from '../lib/storeKeys';
+import { OnlineClass, upcomingClasses, startMs } from '../lib/classes';
 import { todayStr } from '../lib/dates';
 import {
   loadReminderSettings, getTodaysPendingPlan, describeEntry, showStudyNotification, PlanEntryLike,
@@ -25,7 +26,7 @@ const CHECK_EVERY_MS = 30_000;
 /** A daily reminder counts as "on time" (→ notification) within this many minutes. */
 const ON_TIME_WINDOW_MIN = 10;
 
-interface Banner { id: string; title: string; lines: string[] }
+interface Banner { id: string; title: string; lines: string[]; link?: string; linkLabel?: string }
 
 function nowHHMM(d = new Date()) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -84,6 +85,19 @@ export default function ReminderScheduler() {
         }
       }
 
+      // ---- Online classes: 10 minutes before (v1.4) -------------------------
+      for (const c of upcomingClasses(readStore<OnlineClass[]>(STORE_KEYS.classes, []), now.getTime())) {
+        const key = `class:${c.id}`;
+        const minsToStart = Math.round((startMs(c) - now.getTime()) / 60_000);
+        if (!fired.has(key) && minsToStart <= 10 && minsToStart >= -5) {
+          const title = minsToStart > 0 ? `Online class in ${minsToStart} min` : 'Online class starting now';
+          showStudyNotification(`🎥 ${title}`, c.title, key, '/classes');
+          setBanner({ id: key, title: `${title}: ${c.title}`, lines: [], link: '/classes', linkLabel: 'Go to class' });
+          fired.add(key);
+          changed = true;
+        }
+      }
+
       if (changed) saveFired(fired);
     };
 
@@ -109,11 +123,11 @@ export default function ReminderScheduler() {
         )}
       </div>
       <Link
-        to="/plan"
+        to={banner.link || '/plan'}
         onClick={() => setBanner(null)}
         className="text-xs font-semibold bg-white border border-indigo-300 rounded px-2 py-1 hover:bg-indigo-100 shrink-0"
       >
-        Open plan
+        {banner.linkLabel || 'Open plan'}
       </Link>
       <button onClick={() => setBanner(null)} className="p-1 hover:bg-indigo-100 rounded shrink-0" aria-label="Dismiss">
         <X className="h-4 w-4" />

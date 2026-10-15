@@ -1,3 +1,60 @@
+# Upgrade notes — v1.4 (online classes with in-app video)
+
+No existing data, collections, field names or Firestore rules were changed.
+New, additive only: the `dugu_classes` store key and a server function
+`api/video-room.ts` (Vercel, free tier).
+
+## What's new
+- **Online Classes** (new menu item)
+  - Tutors (Teacher role) and Admins **schedule classes**: subject, chapter,
+    planned topics, start time, length, weekly repeat (4/8/12 weeks), notes.
+  - **Time zones:** the scheduler types their own local time; everyone sees it
+    in theirs (and "Tutor's time" is shown when different). Weekly classes keep
+    the same local time across summer-time changes.
+  - **Join** opens 10 minutes before the start and stays open until 30 minutes
+    after the planned end. Video runs **inside EduTrack** in a private room.
+    (A class can instead use an external meeting link, e.g. Google Meet.)
+  - **Complete class** (tutor): tick topics covered, homework, notes. Adds a
+    "Tutor" entry to the Daily Log for the class time (counts for streaks,
+    study time, weekly report, Syllabus progress) and schedules 7/15/30-day
+    revisions — exactly like a manual Daily Log entry.
+  - **Cancel** one class, or (weekly series) all future ones.
+- **Dashboard:** "Next online class" card with countdown and Join.
+- **Reminders:** notification + banner 10 minutes before every class.
+- Revision scheduling moved into `src/lib/revisionScheduler.ts` and is shared
+  by the Daily Log and classes (same records as before).
+
+## In-app video setup (once, free)
+Video uses **Daily.co** (free tier: about 10,000 participant-minutes a month,
+no card needed).
+1. Sign up at **daily.co** (free) and choose a subdomain (e.g. dugu-edutrack).
+2. Daily dashboard → **Developers** → copy your **API key**.
+3. Vercel → baibhav-studies → **Settings → Environment Variables** →
+   **Add**: Name `DAILY_API_KEY`, Value = the key, Environments **Production**
+   and **Preview** → Save. (Never put this key in the code or share it.)
+4. Redeploy (Deployments → ⋯ on the latest → Redeploy), or just merge v1.4.
+Until this is done, classes can still be scheduled; in-app rooms show a
+"not set up yet" message (classes with a meeting link work normally).
+
+### Safety
+- Rooms are **private**; only signed-in, registered EduTrack users get a pass.
+- Passes expire 30 minutes after the class ends; rooms expire too.
+- The tutor (and Admin) is the room **owner**; max 6 participants.
+- The Daily key stays on the server (Vercel), never in the browser.
+
+## New / changed files (v1.4)
+New: api/video-room.ts, src/lib/classes.ts, src/lib/videoRoom.ts,
+src/lib/revisionScheduler.ts, src/pages/Classes.tsx, src/pages/ClassRoom.tsx,
+src/components/ClassCard.tsx, src/components/ScheduleClassModal.tsx,
+src/components/CompleteClassModal.tsx, src/components/NextClassCard.tsx,
+src/components/DailyFrame.tsx
+Changed: vercel.json (rewrite skips /api), src/App.tsx, src/components/Sidebar.tsx,
+src/components/ReminderScheduler.tsx, src/lib/reminders.ts, src/lib/storeKeys.ts,
+src/pages/Dashboard.tsx, src/pages/DailyLog.tsx, README.md, UserManual.md,
+UPGRADE_NOTES.md
+
+---
+
 # Upgrade notes — v1.3 (stay signed in, installable app & offline, streaks, weekly report)
 
 No existing data, collections or field names were changed, and nothing new is

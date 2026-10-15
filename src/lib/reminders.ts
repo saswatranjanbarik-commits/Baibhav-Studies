@@ -120,9 +120,9 @@ export async function requestNotificationPermission(): Promise<NotificationStatu
 }
 
 /** Show a notification. Returns false if it couldn't be shown. */
-export async function showStudyNotification(title: string, body: string, tag: string): Promise<boolean> {
+export async function showStudyNotification(title: string, body: string, tag: string, url = '/plan'): Promise<boolean> {
   if (notificationStatus() !== 'granted') return false;
-  const options: NotificationOptions = { body, tag, data: { url: '/plan' } };
+  const options: NotificationOptions = { body, tag, data: { url } };
   try {
     const reg = await ensureServiceWorker();
     if (reg) {

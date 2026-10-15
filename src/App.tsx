@@ -28,6 +28,8 @@ import ManageUsers from './pages/ManageUsers';
 import Appreciation from './pages/Appreciation';
 import Backup from './pages/Backup';
 import WeeklyReport from './pages/WeeklyReport';
+import Classes from './pages/Classes';
+import ClassRoom from './pages/ClassRoom';
 
 export default function App() {
   return (
@@ -38,6 +40,9 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             
             <Route element={<ProtectedRoute />}>
+              {/* Full-screen video room (no sidebar) — v1.4 */}
+              <Route path="/classes/:id/room" element={<ClassRoom />} />
+
               <Route element={<Layout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/daily-log" element={<DailyLog />} />
@@ -51,6 +56,7 @@ export default function App() {
                 <Route path="/timetable" element={<Timetable />} />
                 <Route path="/appreciation" element={<Appreciation />} />
                 <Route path="/report" element={<WeeklyReport />} />
+                <Route path="/classes" element={<Classes />} />
                 <Route path="*" element={<Dashboard />} />
 
                 {/* Teacher & Admin only */}
