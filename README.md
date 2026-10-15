@@ -25,6 +25,9 @@ npm run build    # production build into /dist (what Vercel runs)
 | `src/lib/studyStats.ts` | Streaks, badges, weekly report calculations |
 | `src/pages/WeeklyReport.tsx` | Weekly progress report (printable) |
 | `public/manifest.webmanifest`, `public/icons/` | Installable app |
+| `src/pages/Classes.tsx`, `src/pages/ClassRoom.tsx` | Online classes: schedule, join (in-app video), complete |
+| `src/lib/classes.ts` | Class records & time-zone handling (`dugu_classes`) |
+| `api/video-room.ts` | Vercel server function: private Daily.co room + pass (needs `DAILY_API_KEY`) |
 | `src/lib/storeKeys.ts` | **The names of every saved data set — never rename these** |
 | `src/lib/dates.ts` | Local-timezone date helpers (use instead of `toISOString()`) |
 | `src/config/app.ts` | Primary admin email and storage limits |
@@ -46,7 +49,8 @@ npm run build    # production build into /dist (what Vercel runs)
   `dugu_syllabus_v2`, `dugu_study_plan`, `dugu_revisions`, `dugu_tasks`,
   `dugu_events`, `dugu_timetable`, `dugu_study_notes`, `dugu_team_notes`,
   `dugu_learning_items`, `dugu_appreciation`, `dugu_upcoming_event`,
-  `dugu_reminders` (v1.2)).
+  `dugu_reminders` (v1.2), `dugu_revision_settings`, `dugu_revisions_archive`,
+  `dugu_topic_status` (v1.3), `dugu_classes` (v1.4)).
 
 Pages read/write `localStorage` with these keys; `StoreSync` mirrors them to
 Firestore. New features must **add** keys or **optional** fields — never rename

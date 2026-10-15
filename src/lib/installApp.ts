@@ -38,11 +38,30 @@ export function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(ua) || (ua.includes('Macintosh') && 'ontouchend' in document);
 }
 
-export type InstallMode = 'prompt' | 'ios' | 'installed' | 'unavailable';
+export function isAndroid(): boolean {
+  return /Android/i.test(navigator.userAgent);
+}
+
+export function isSamsungInternet(): boolean {
+  return /SamsungBrowser/i.test(navigator.userAgent);
+}
+
+/**
+ * prompt    – the browser offered an install: one-tap button
+ * ios       – iPhone/iPad: Share → Add to Home Screen
+ * android   – Android without an offer (yet): browser-menu instructions
+ * installed – already running as the installed app: hide
+ * unavailable – desktop without an offer: hide
+ */
+export type InstallMode = 'prompt' | 'ios' | 'android' | 'installed' | 'unavailable';
 
 export function useInstallApp(): { mode: InstallMode; install: () => Promise<void> } {
   const compute = (): InstallMode =>
-    isInstalled() ? 'installed' : deferredPrompt ? 'prompt' : isIOS() ? 'ios' : 'unavailable';
+    isInstalled() ? 'installed'
+      : deferredPrompt ? 'prompt'
+      : isIOS() ? 'ios'
+      : isAndroid() ? 'android'
+      : 'unavailable';
   const [mode, setMode] = useState<InstallMode>(compute);
 
   useEffect(() => {

@@ -18,11 +18,13 @@ import {
   Star,
   Database,
   TrendingUp,
+  MonitorPlay,
   X
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: BarChart2, color: 'text-indigo-600', roles: ['Admin', 'Teacher', 'Student'] },
+  { name: 'Online Classes', href: '/classes', icon: MonitorPlay, color: 'text-indigo-600', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Weekly Report', href: '/report', icon: TrendingUp, color: 'text-emerald-600', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Appreciation', href: '/appreciation', icon: Star, color: 'text-yellow-500', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Daily Log', href: '/daily-log', icon: ClipboardList, color: 'text-indigo-500', roles: ['Admin', 'Teacher', 'Student'] },

@@ -38,6 +38,10 @@ As a Teacher, your primary role is to manage the study plan, evaluate students, 
 - **Study Materials & Flashcards:**
   - Go to **Flashcards** to create flashcards and quizzes for chapters or topics.
   - Access **Study Notes** and **Team Notes** to share important information and collaborative materials with students.
+- **Online classes:**
+  - Open **Online Classes → Schedule class**. Pick the subject/chapter, type the start in *your* local time, choose the length and whether it repeats weekly. The student sees it in their own time zone.
+  - Press **Join** (from 10 minutes before). The video opens inside EduTrack; allow the camera and microphone the first time.
+  - After the class press **Leave** (or **Complete**) and tick the topics covered — this adds it to the Daily Log and schedules revisions.
 - **Marking topics completed:**
   - On the **Syllabus** page, use **Mark topics completed** to tick off everything already covered in class (you can tick whole chapters or all Term-1 chapters at once), or use **✓ Mark completed** on a single topic. **Unmark** undoes it.
 - **Syllabus Navigation:**

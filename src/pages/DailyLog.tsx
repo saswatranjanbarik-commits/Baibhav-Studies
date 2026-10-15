@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ClipboardList, Plus, X, Search, Filter, Calendar, Clock, BookOpen, RefreshCw, ChevronLeft, ChevronRight, CheckCircle, Activity, Gamepad2, UserCircle, Users, Trash2, GraduationCap } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useTeamUsers } from '../lib/useTeamUsers';
-import { shouldScheduleRevisions } from '../lib/revisionReset';
+import { scheduleRevisionsForLog } from '../lib/revisionScheduler';
 import { todayStr, toDateStr, parseDateStr, addDays } from '../lib/dates';
 
 type LogType = 'School' | 'Tutor' | 'Self Study' | 'Play' | 'Activity';
@@ -108,35 +108,10 @@ export default function DailyLog() {
     }
   };
 
+  // Shared with "Complete class" — see src/lib/revisionScheduler.ts (same records as before).
   const scheduleRevisions = (log: DailyLogEntry) => {
-    if (log.category !== 'Rock') return; // Only Rock logs need revisions
-    if (!shouldScheduleRevisions(log.date)) return; // before the revision "fresh start" date
-    const savedRevisions = localStorage.getItem('dugu_revisions');
-    let savedRevs: RevisionEntry[] = savedRevisions ? JSON.parse(savedRevisions) : [];
-    
-    const logDate = parseDateStr(log.date);
-    
-    const createRevision = (days: number, type: '7 Day' | '15 Day' | '30 Day'): RevisionEntry => {
-      const d = new Date(logDate);
-      d.setDate(d.getDate() + days);
-      return {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-        logId: log.id,
-        dateScheduled: toDateStr(d),
-        type,
-        subjectName: log.subjectName || '',
-        chapterName: log.chapterName || '',
-        topicName: Array.isArray(log.topicName) ? log.topicName.join(', ') : log.topicName || '',
-        subTopicName: Array.isArray(log.subTopicName) ? log.subTopicName.join(', ') : log.subTopicName,
-        status: 'Pending'
-      };
-    };
-
-    savedRevs.push(createRevision(7, '7 Day'));
-    savedRevs.push(createRevision(15, '15 Day'));
-    savedRevs.push(createRevision(30, '30 Day'));
-    setRevisions(savedRevs);
-    localStorage.setItem('dugu_revisions', JSON.stringify(savedRevs));
+    const updated = scheduleRevisionsForLog(log);
+    if (updated) setRevisions(updated);
   };
 
   const activeSubject = syllabus.find(s => s.id === newLog.subjectId);

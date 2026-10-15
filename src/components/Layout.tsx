@@ -28,7 +28,7 @@ export default function Layout() {
           </button>
           <BookOpen className="h-6 w-6 text-indigo-300 hidden sm:block" />
           <h1 className="text-lg sm:text-xl font-extrabold tracking-tight font-sans whitespace-nowrap">Dugu EduTrack</h1>
-          <span className="hidden sm:inline text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold ml-1 sm:ml-2">v1.3</span>
+          <span className="hidden sm:inline text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold ml-1 sm:ml-2">v1.4</span>
           <SyncBadge />
         </div>
         

@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../lib/AuthContext';
 import TeamOnline from '../components/TeamOnline';
 import StreakCard from '../components/StreakCard';
+import NextClassCard from '../components/NextClassCard';
 import { STORE_KEYS, readStore } from '../lib/storeKeys';
 import { makeTopicStatusLookup, TopicMark } from '../lib/topicStatus';
 import { loadRevisionSettings, isCurrentRevision } from '../lib/revisionReset';
@@ -298,6 +299,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Next online class (v1.4) — only shown when one is coming up */}
+      <NextClassCard />
 
       {/* Study streak & badges (v1.3) */}
       <StreakCard />
