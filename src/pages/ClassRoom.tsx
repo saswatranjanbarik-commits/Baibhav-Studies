@@ -9,6 +9,9 @@
  *         2. Questions & comments — live class board + "My notes"
  *         3. Learning — study notes, flashcards, quiz for the class topics
  *         4. Whiteboard — live shared drawing board (off until switched on)
+ *       Tutor/Admin can "Present to class": students' Learning window then
+ *       shows exactly what the tutor opens. Everyone gets Share screen /
+ *       Chat buttons for the video in the header.
  *       The layout is remembered on each device (see lib/classroomLayout.ts).
  *       The video stays connected while windows are resized or switched off.
  */
@@ -27,12 +30,14 @@ import {
   ClassroomLayout, ClassroomPanel, DEFAULT_LAYOUT, loadLayout, saveLayout, togglePanel, revealPanel, isWideScreen,
 } from '../lib/classroomLayout';
 import {
-  ClassMessage, SharedItem, BoardMeta, listenToClassBoard, postMessage, newMessageId, openQuestionCount, setWhiteboardPage,
+  ClassMessage, SharedItem, BoardMeta, PresentView, listenToClassBoard, postMessage, newMessageId, openQuestionCount, setWhiteboardPage,
+  setPresent,
 } from '../lib/classChat';
 import ResizeHandle from '../components/classroom/ResizeHandle';
 import QuestionsPanel from '../components/classroom/QuestionsPanel';
 import LearningPanel, { LearningFocus, LearningTab } from '../components/classroom/LearningPanel';
 import Whiteboard from '../components/classroom/Whiteboard';
+import VideoControls from '../components/classroom/VideoControls';
 
 export default function ClassRoom() {
   const { id } = useParams();
@@ -89,7 +94,7 @@ export default function ClassRoom() {
 
   // ---- v1.5: live class board ------------------------------------------------
   const [messages, setMessages] = useState<Record<string, ClassMessage>>({});
-  const [boardMeta, setBoardMeta] = useState<BoardMeta>({ wbPage: 1, wbPages: 1 });
+  const [boardMeta, setBoardMeta] = useState<BoardMeta>({ wbPage: 1, wbPages: 1, present: null });
   const [boardError, setBoardError] = useState<string | null>(null);
   const [focus, setFocus] = useState<LearningFocus | null>(null);
 
@@ -98,6 +103,62 @@ export default function ClassRoom() {
     setBoardError(null);
     return listenToClassBoard(cls.id, (m, meta) => { setMessages(m); setBoardMeta(meta); setBoardError(null); }, setBoardError);
   }, [cls?.id]);
+
+  // ---- v1.5: presenting the Learning window --------------------------------------
+  const present = boardMeta.present;
+  const iAmPresenting = !!present && !!currentUser && present.by === currentUser.email;
+  /** startedAt of a presentation this user chose not to follow ("Browse myself"). */
+  const [skippedPresentation, setSkippedPresentation] = useState<string | null>(null);
+  const following = !!present && !iAmPresenting && skippedPresentation !== present.startedAt;
+  const presentTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const presentingRef = useRef(false);
+  const presentStartRef = useRef('');
+  presentingRef.current = iAmPresenting;
+
+  // A new presentation starts → followers' Learning window opens in front.
+  useEffect(() => {
+    if (present && !iAmPresenting && skippedPresentation !== present.startedAt) {
+      setLayout((l) => revealPanel(l, 'learning'));
+    }
+  }, [present?.startedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sendPresent = useCallback((view: PresentView, startedAt: string) => {
+    if (!cls || !currentUser) return;
+    if (presentTimer.current) clearTimeout(presentTimer.current);
+    // Small delay so quick clicks send one update.
+    presentTimer.current = setTimeout(() => {
+      setPresent(cls.id, {
+        ...view,
+        by: currentUser.email,
+        byName: currentUser.username || currentUser.email,
+        startedAt,
+        at: new Date().toISOString(),
+      }).catch((e) => { console.warn(e); setBoardError('Could not update the presentation. Check the connection.'); });
+    }, 250);
+  }, [cls?.id, currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const togglePresent = () => {
+    if (!cls) return;
+    if (iAmPresenting) {
+      if (presentTimer.current) clearTimeout(presentTimer.current);
+      setPresent(cls.id, null).catch((e) => console.warn(e));
+    } else {
+      presentStartRef.current = new Date().toISOString();
+      sendPresent({ tab: 'notes', label: 'Notes list' }, presentStartRef.current);
+    }
+  };
+  const onPresentView = useCallback((view: PresentView) => {
+    sendPresent(view, present?.startedAt || presentStartRef.current || new Date().toISOString());
+  }, [sendPresent, present?.startedAt]);
+
+  // Leaving the class room stops a presentation.
+  useEffect(() => () => {
+    if (presentTimer.current) clearTimeout(presentTimer.current);
+    if (presentingRef.current && cls?.id) setPresent(cls.id, null).catch(() => {});
+  }, [cls?.id]);
+
+  // ---- v1.5: the joined video call (for the Share screen / Chat buttons) -----------
+  const [frame, setFrame] = useState<any | null>(null);
 
   /** Whiteboard pages are shared: changing page moves everyone. */
   const changeBoardPage = useCallback((page: number, pages?: number) => {
@@ -154,7 +215,7 @@ export default function ClassRoom() {
       </Message>
     );
   } else if (pass) {
-    body = <DailyFrame pass={pass} title={cls.title} onLeft={leave} />;
+    body = <DailyFrame pass={pass} title={cls.title} onLeft={leave} onFrame={setFrame} />;
   }
 
   // ---- Sizes -----------------------------------------------------------------
@@ -196,6 +257,7 @@ export default function ClassRoom() {
         {cls && cls.status === 'Scheduled' && minsLeft > 0 && minsLeft < 600 && (
           <span className="hidden md:inline text-xs text-indigo-100 whitespace-nowrap">{minsLeft} min left</span>
         )}
+        <VideoControls frame={frame} onShowVideo={() => setLayout((l) => revealPanel(l, 'video'))} />
         {hasClass && (
           <div className="flex items-center gap-1" role="group" aria-label="Show or hide windows">
             <PanelToggle panel="video" label="Video" on={layout.show.video} onToggle={toggle} Icon={Video} />
@@ -284,7 +346,18 @@ export default function ClassRoom() {
             )}
             <div style={learningStyle} className="min-h-0 relative">
               <div className="absolute inset-0 overflow-hidden">
-                <LearningPanel cls={cls} focus={focus} onShare={shareToBoard} />
+                <LearningPanel
+                  cls={cls}
+                  focus={focus}
+                  onShare={shareToBoard}
+                  onTogglePresent={isHost ? togglePresent : undefined}
+                  presenting={iAmPresenting}
+                  onPresentView={onPresentView}
+                  follow={following ? present : null}
+                  onBrowseMyself={() => setSkippedPresentation(present?.startedAt || null)}
+                  notFollowing={present && !iAmPresenting && !following ? present : null}
+                  onFollow={() => setSkippedPresentation(null)}
+                />
               </div>
             </div>
             {bothSide && !sideTabbed && (

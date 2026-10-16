@@ -121,9 +121,15 @@ export default async function handler(req: any, res: any) {
         body: JSON.stringify({ name: roomName, privacy: 'private', properties: roomProps }),
       });
     } else if (room.ok) {
-      const currentExp = room.data?.config?.exp || 0;
-      if (currentExp < exp) {
-        room = await daily(`/rooms/${roomName}`, dailyKey, { method: 'POST', body: JSON.stringify({ properties: { exp } }) });
+      // Existing room: extend its expiry if needed, and make sure chat and
+      // screen sharing are switched on for everyone (v1.5).
+      const config = room.data?.config || {};
+      const currentExp = config.exp || 0;
+      if (currentExp < exp || config.enable_chat !== true || config.enable_screenshare === false) {
+        room = await daily(`/rooms/${roomName}`, dailyKey, {
+          method: 'POST',
+          body: JSON.stringify({ properties: { exp: Math.max(currentExp, exp), enable_chat: true, enable_screenshare: true } }),
+        });
       }
     }
     if (!room.ok || !room.data?.url) {
@@ -135,7 +141,8 @@ export default async function handler(req: any, res: any) {
     const token = await daily('/meeting-tokens', dailyKey, {
       method: 'POST',
       body: JSON.stringify({
-        properties: { room_name: roomName, user_name: name, is_owner: isHost, exp },
+        // enable_screenshare: students may share their screen too (v1.5).
+        properties: { room_name: roomName, user_name: name, is_owner: isHost, enable_screenshare: true, exp },
       }),
     });
     if (!token.ok || !token.data?.token) {

@@ -4,7 +4,7 @@
  * Optional "Ask the class" puts the question on the class board as a live
  * poll that everyone can answer.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, RotateCcw, Send, CheckCircle2, XCircle } from 'lucide-react';
 import { Empty } from './FlashcardDeck';
 
@@ -14,9 +14,11 @@ interface Props {
   questions: QuizQuestion[];
   focusId?: string | null;
   onShare?: (q: QuizQuestion) => void;
+  /** v1.5 presenting: told which question is on screen and whether its answer shows. */
+  onViewChange?: (q: QuizQuestion | null, revealed: boolean, label: string) => void;
 }
 
-export default function QuizRunner({ questions, focusId, onShare }: Props) {
+export default function QuizRunner({ questions, focusId, onShare, onViewChange }: Props) {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
 
@@ -27,6 +29,15 @@ export default function QuizRunner({ questions, focusId, onShare }: Props) {
     const i = questions.findIndex((q) => q.id === focusId);
     if (i >= 0) setIndex(i);
   }, [focusId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Report what is on screen (used when the tutor presents).
+  const current = questions.length ? questions[Math.min(index, questions.length - 1)] : null;
+  const viewRef = useRef(onViewChange);
+  viewRef.current = onViewChange;
+  const shownAnswer = current ? answers[current.id] !== undefined : false;
+  useEffect(() => {
+    viewRef.current?.(current, shownAnswer, current ? `Question ${index + 1} of ${questions.length}` : '');
+  }, [current?.id, shownAnswer, index, questions.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!questions.length) {
     return <Empty text="No quiz questions here yet. Try a wider scope, or add questions on the Flashcards page." />;
