@@ -36,13 +36,20 @@ interface Props {
   title: string;
   /** Called when the person leaves the meeting from inside the video UI. */
   onLeft: () => void;
+  /**
+   * v1.5: gives the class room the video call once joined (null when it
+   * closes), so it can offer its own Share screen / Chat buttons.
+   */
+  onFrame?: (frame: any | null) => void;
 }
 
-export default function DailyFrame({ pass, title, onLeft }: Props) {
+export default function DailyFrame({ pass, title, onLeft, onFrame }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [fallback, setFallback] = useState(false);
   const onLeftRef = useRef(onLeft);
   onLeftRef.current = onLeft;
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
 
   useEffect(() => {
     let frame: any = null;
@@ -56,7 +63,9 @@ export default function DailyFrame({ pass, title, onLeft }: Props) {
           showFullscreenButton: true,
         });
         frame.on('left-meeting', () => onLeftRef.current());
-        frame.join({ url: pass.url, token: pass.token }).catch((e: any) => {
+        frame.join({ url: pass.url, token: pass.token }).then(() => {
+          if (!cancelled) onFrameRef.current?.(frame);
+        }).catch((e: any) => {
           console.warn('Daily join failed, using fallback frame', e);
           frame?.destroy();
           frame = null;
@@ -69,6 +78,7 @@ export default function DailyFrame({ pass, title, onLeft }: Props) {
       });
     return () => {
       cancelled = true;
+      onFrameRef.current?.(null);
       try { frame?.destroy(); } catch { /* ignore */ }
     };
   }, [pass.url, pass.token]);

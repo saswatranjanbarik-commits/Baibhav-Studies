@@ -127,8 +127,27 @@ export function tallyResponses(m: ClassMessage): number[] {
 // ---------------------------------------------------------------------------
 
 /** Live updates of a class board. Returns the unsubscribe function. */
-/** Shared whiteboard page state, kept on the class board document (v1.5). */
-export interface BoardMeta { wbPage: number; wbPages: number }
+/**
+ * What the presenting tutor is showing in their Learning window (v1.5).
+ * Followers see exactly this. A copy of the item is included so it shows
+ * instantly on the student's screen.
+ */
+export interface PresentView {
+  tab: 'notes' | 'flashcards' | 'quiz';
+  item?: SharedItem;        // the note / card / question on screen (none = list)
+  flipped?: boolean;        // flashcard showing its answer
+  revealed?: boolean;       // quiz answer shown
+  label?: string;           // e.g. "Card 3 of 12"
+}
+export interface PresentState extends PresentView {
+  by: string;               // presenter email
+  byName: string;
+  startedAt: string;        // ISO — a new presentation has a new value
+  at: string;               // ISO — last change
+}
+
+/** Shared class-room state kept on the class board document (v1.5). */
+export interface BoardMeta { wbPage: number; wbPages: number; present: PresentState | null }
 
 export function listenToClassBoard(
   classId: string,
@@ -142,7 +161,8 @@ export function listenToClassBoard(
       const data = snap.data() || {};
       const wbPages = Math.max(1, Number(data.wbPages) || 1);
       const wbPage = Math.min(wbPages, Math.max(1, Number(data.wbPage) || 1));
-      onData((data.messages as Record<string, ClassMessage>) || {}, { wbPage, wbPages });
+      const present = data.present && data.present.by && data.present.tab ? (data.present as PresentState) : null;
+      onData((data.messages as Record<string, ClassMessage>) || {}, { wbPage, wbPages, present });
     },
     (err) => {
       console.warn('Class board listener failed:', err);
@@ -173,6 +193,17 @@ export async function setWhiteboardPage(classId: string, page: number, pages?: n
   const data: Record<string, unknown> = { classId, wbPage: page, updatedAt: serverTimestamp() };
   if (pages) data.wbPages = pages;
   await setDoc(ref, data, { merge: true });
+}
+
+/** Start/update (state) or stop (null) presenting the Learning window. */
+export async function setPresent(classId: string, state: PresentState | null) {
+  const ref = doc(db, STORE_COLLECTION, roomDocId(classId));
+  if (state) {
+    // mergeFields replaces the whole "present" value (no leftovers from the previous item).
+    await setDoc(ref, { classId, present: clean(state) }, { mergeFields: ['classId', 'present'] });
+  } else {
+    await setDoc(ref, { present: deleteField() }, { merge: true });
+  }
 }
 
 export async function setAnswered(classId: string, messageId: string, answered: boolean, by: string) {

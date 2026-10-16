@@ -3,7 +3,7 @@
  * Tap the card to flip it. Optional "Show to class" puts the card on the
  * class board so everyone sees it.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Shuffle, RotateCcw, Send } from 'lucide-react';
 
 export interface DeckCard { id: string; front?: string; back?: string; topicName?: string }
@@ -13,9 +13,11 @@ interface Props {
   /** Start on this card (e.g. opened from the class board). */
   focusId?: string | null;
   onShare?: (card: DeckCard) => void;
+  /** v1.5 presenting: told which card is on screen and whether it is flipped. */
+  onViewChange?: (card: DeckCard | null, flipped: boolean, label: string) => void;
 }
 
-export default function FlashcardDeck({ cards, focusId, onShare }: Props) {
+export default function FlashcardDeck({ cards, focusId, onShare, onViewChange }: Props) {
   const [order, setOrder] = useState<string[]>(() => cards.map((c) => c.id));
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -36,6 +38,13 @@ export default function FlashcardDeck({ cards, focusId, onShare }: Props) {
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const card = byId.get(order[index]);
+
+  // Report what is on screen (used when the tutor presents).
+  const viewRef = useRef(onViewChange);
+  viewRef.current = onViewChange;
+  useEffect(() => {
+    viewRef.current?.(card || null, flipped, card ? `Card ${index + 1} of ${order.length}` : '');
+  }, [card?.id, flipped, index, order.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!cards.length) {
     return <Empty text="No flashcards here yet. Try a wider scope, or add cards on the Flashcards page." />;

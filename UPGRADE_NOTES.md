@@ -29,6 +29,20 @@ few hundred of Firestore's 20,000 free daily writes.
      download the page as a picture (PNG), several pages (everyone sees the
      same page). Tutor/Admin can clear a page. Works with mouse, finger and
      stylus; the drawing looks the same on every screen size.
+- **Present to class** (Tutor/Admin, top of the Learning window): while on,
+  the student's Learning window shows exactly what the tutor opens — the same
+  study note, the same flashcard (front or back, as the tutor flips it), the
+  same quiz question (the student can tap an answer; the right one shows when
+  the tutor reveals it). The student can press "Browse myself" and "Follow"
+  again. Stops when the tutor presses Stop or leaves the class room.
+  Note: inside an embedded Google Drive/PDF note, scrolling and page turns
+  are not mirrored (those sites don't allow it) — use Share screen for that.
+- **Share screen and Chat buttons for everyone** (tutor and student) in the
+  class room header, always visible even when the video window is small.
+  The server now also switches chat and screen sharing on for rooms created
+  earlier, and every pass allows screen sharing.
+  Screen sharing needs a laptop/computer browser — Android tablets and
+  iPads can't share their screen from a browser (the button explains this).
 - **Layout:** left column = Video above Whiteboard, right column = Learning
   above Questions; every divider can be dragged.
 - **Switch windows on/off** with the header buttons (the last one can't be
@@ -47,10 +61,12 @@ few hundred of Firestore's 20,000 free daily writes.
 ## New / changed files (v1.5)
 New: src/lib/classroomLayout.ts, src/lib/classChat.ts, src/lib/classroomContent.ts,
 src/lib/whiteboard.ts, src/components/classroom/Whiteboard.tsx,
+src/components/classroom/PresentedView.tsx, src/components/classroom/VideoControls.tsx,
 src/components/classroom/ResizeHandle.tsx, src/components/classroom/LearningPanel.tsx,
 src/components/classroom/QuestionsPanel.tsx, src/components/classroom/FlashcardDeck.tsx,
 src/components/classroom/QuizRunner.tsx
 Changed: src/pages/ClassRoom.tsx, src/components/ClassCard.tsx, src/pages/Backup.tsx,
+src/components/DailyFrame.tsx, api/video-room.ts (chat + screen share for everyone),
 src/components/Layout.tsx (v1.5 label), README.md, UserManual.md, UPGRADE_NOTES.md
 
 ---

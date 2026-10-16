@@ -4,18 +4,25 @@
  *
  * Reads the existing data sets (dugu_study_notes, dugu_learning_items) —
  * read-only, nothing is changed. Practice results are not saved.
+ *
+ * Presenting (tutor/admin): "Present to class" makes every student's
+ * Learning window show exactly what the tutor has open — the same note,
+ * flashcard (and whether it is flipped) or quiz question (and whether the
+ * answer is shown). Students see it in PresentedView and can choose
+ * "Browse myself" / "Follow" at any time.
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { FileText, Layers, Target, Search, ExternalLink, ArrowLeft } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { FileText, Layers, Target, Search, ExternalLink, ArrowLeft, Presentation, Square } from 'lucide-react';
 import { STORE_KEYS } from '../../lib/storeKeys';
 import { useStoredData } from '../../lib/useStoredData';
 import type { OnlineClass } from '../../lib/classes';
 import {
   ContentScope, SCOPE_LABELS, availableScopes, defaultScope, scopeFilter, matchesSearch, embeddableUrl,
 } from '../../lib/classroomContent';
-import type { SharedItem } from '../../lib/classChat';
+import type { SharedItem, PresentView, PresentState } from '../../lib/classChat';
 import FlashcardDeck, { Empty } from './FlashcardDeck';
 import QuizRunner from './QuizRunner';
+import PresentedView from './PresentedView';
 
 export type LearningTab = 'notes' | 'flashcards' | 'quiz';
 
@@ -37,6 +44,20 @@ interface Props {
   focus: LearningFocus | null;
   /** Post an item to the class board (undefined = sharing not available). */
   onShare?: (item: SharedItem) => void;
+
+  // ---- Presenting (v1.5) ----
+  /** Tutor/admin only: start/stop presenting. Undefined = can't present. */
+  onTogglePresent?: () => void;
+  /** True while THIS user is presenting. */
+  presenting?: boolean;
+  /** Called with what is on screen while presenting. */
+  onPresentView?: (view: PresentView) => void;
+  /** Someone else is presenting and this user is following them. */
+  follow?: PresentState | null;
+  onBrowseMyself?: () => void;
+  /** Someone else is presenting but this user chose to browse on their own. */
+  notFollowing?: PresentState | null;
+  onFollow?: () => void;
 }
 
 const TABS: { id: LearningTab; label: string; Icon: typeof FileText }[] = [
@@ -45,7 +66,9 @@ const TABS: { id: LearningTab; label: string; Icon: typeof FileText }[] = [
   { id: 'quiz', label: 'Quiz', Icon: Target },
 ];
 
-export default function LearningPanel({ cls, focus, onShare }: Props) {
+export default function LearningPanel({
+  cls, focus, onShare, onTogglePresent, presenting, onPresentView, follow, onBrowseMyself, notFollowing, onFollow,
+}: Props) {
   const notes = useStoredData<StudyNoteLike[]>(STORE_KEYS.studyNotes, []);
   const items = useStoredData<LearningItemLike[]>(STORE_KEYS.learningItems, []);
 
@@ -87,11 +110,57 @@ export default function LearningPanel({ cls, focus, onShare }: Props) {
     if (target && !scopeFilter(cls, scope)(target)) setScope('all');
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ---- Presenting: work out what is on screen and report it --------------------
+  type Shown = { item?: SharedItem; flag: boolean; label: string };
+  const [deckView, setDeckView] = useState<Shown>({ flag: false, label: '' });
+  const [quizView, setQuizView] = useState<Shown>({ flag: false, label: '' });
+  const reportRef = useRef(onPresentView);
+  reportRef.current = onPresentView;
+  const noteItem: SharedItem | undefined = openNote
+    ? { type: 'note', itemId: openNote.id, title: openNote.title, link: openNote.link }
+    : undefined;
+  const shown: PresentView =
+    tab === 'notes' ? { tab, item: noteItem, label: openNote ? '' : 'Notes list' }
+    : tab === 'flashcards' ? { tab, item: deckView.item, flipped: deckView.flag, label: deckView.label }
+    : { tab, item: quizView.item, revealed: quizView.flag, label: quizView.label };
+  const shownKey = JSON.stringify(shown);
+  useEffect(() => {
+    if (presenting) reportRef.current?.(shown);
+  }, [presenting, shownKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const counts: Record<LearningTab, number> = { notes: visibleNotes.length, flashcards: cards.length, quiz: questions.length };
   const scopes = availableScopes(cls);
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="relative h-full flex flex-col bg-white">
+      {/* Following the tutor: their view covers this window (own browsing is kept underneath) */}
+      {follow && onBrowseMyself && (
+        <div className="absolute inset-0 z-10">
+          <PresentedView present={follow} onBrowseMyself={onBrowseMyself} />
+        </div>
+      )}
+
+      {/* Presenting controls (tutor/admin) / "Follow" for a student browsing alone */}
+      {onTogglePresent && (
+        <div className={`shrink-0 flex items-center gap-2 px-2 py-1 text-xs border-b ${presenting ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+          <span className="flex-1 min-w-0 truncate">
+            {presenting ? '● Presenting — the class sees what you open here' : 'Show the class exactly what you open here'}
+          </span>
+          <button
+            onClick={onTogglePresent}
+            className={`inline-flex items-center gap-1 font-semibold rounded px-2 py-1 shrink-0 ${presenting ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+          >
+            {presenting ? <><Square className="h-3.5 w-3.5" /> Stop presenting</> : <><Presentation className="h-3.5 w-3.5" /> Present to class</>}
+          </button>
+        </div>
+      )}
+      {notFollowing && onFollow && (
+        <div className="shrink-0 flex items-center gap-2 px-2 py-1 text-xs bg-indigo-50 border-b border-indigo-200 text-indigo-800">
+          <span className="flex-1 min-w-0 truncate"><strong>{notFollowing.byName}</strong> is presenting</span>
+          <button onClick={onFollow} className="font-semibold bg-indigo-600 text-white rounded px-2 py-1 shrink-0">Follow</button>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex border-b border-slate-200 shrink-0">
         {TABS.map(({ id, label, Icon }) => (
@@ -137,6 +206,10 @@ export default function LearningPanel({ cls, focus, onShare }: Props) {
           <FlashcardDeck
             cards={cards}
             focusId={focus?.tab === 'flashcards' ? focus.itemId : null}
+            onViewChange={(c, flipped, label) => setDeckView({
+              item: c ? { type: 'flashcard', itemId: c.id, title: c.front || 'Flashcard', front: c.front, back: c.back } : undefined,
+              flag: flipped, label,
+            })}
             onShare={onShare && ((c) => onShare({ type: 'flashcard', itemId: c.id, title: c.front || 'Flashcard', front: c.front, back: c.back }))}
           />
         )}
@@ -144,6 +217,10 @@ export default function LearningPanel({ cls, focus, onShare }: Props) {
           <QuizRunner
             questions={questions}
             focusId={focus?.tab === 'quiz' ? focus.itemId : null}
+            onViewChange={(q, revealed, label) => setQuizView({
+              item: q ? { type: 'quiz', itemId: q.id, title: q.question || 'Quiz question', question: q.question, options: q.options, correctOptionIndex: q.correctOptionIndex } : undefined,
+              flag: revealed, label,
+            })}
             onShare={onShare && ((q) => onShare({ type: 'quiz', itemId: q.id, title: q.question || 'Quiz question', question: q.question, options: q.options, correctOptionIndex: q.correctOptionIndex }))}
           />
         )}
