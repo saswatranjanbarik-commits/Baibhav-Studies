@@ -50,7 +50,7 @@ export default function Backup() {
       const extraSnap = await getDocs(collection(db, STORE_COLLECTION));
       const classrooms = Object.fromEntries(
         extraSnap.docs
-          .filter((d) => /^(classroom_|whiteboard_|mynotes_|scan_)/.test(d.id))
+          .filter((d) => /^(classroom_|whiteboard_|mynotes_|scan_|task_submissions$)/.test(d.id))
           .map((d) => [d.id, d.data()]),
       );
 
