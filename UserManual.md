@@ -37,6 +37,8 @@ As a Teacher, your primary role is to manage the study plan, evaluate students, 
   - Use the **Daily Log** to record what was taught in class. Your logs will automatically reflect in the Calendar and update the Subject Progress.
 - **Study Materials & Flashcards:**
   - Go to **Flashcards** to create flashcards and quizzes for chapters or topics.
+  - **Homework submissions:** on **Tasks**, tap a submitted page to view it full screen (zoom, rotate, download). Write feedback and press **Mark reviewed**.
+  - **Scanned answers in class** appear on the class board — tap to enlarge.
   - **Study Notes:** pick subject and chapter (topic is optional) and paste the link — the title is made automatically. Use ✏️ to edit and 🗑 to delete a note.
   - Access **Study Notes** and **Team Notes** to share important information and collaborative materials with students.
 - **Online classes:**
@@ -83,6 +85,8 @@ As a Student, you can track your study progress, complete tasks, and review mate
 - **Learning Materials:**
   - Click on the **Syllabus** to see what you need to study. Expand chapters/topics to view activity logs and click the link to access Flashcards & Quizzes for that section.
   - Use **Flashcards** and **Study Notes** to revise for your exams.
+- **Submitting homework:** on **Tasks**, press **Scan & submit**, take a photo of each page (lay it flat, good light, fill the screen), then press **Submit**. Use **Add more pages** if you forgot one. Your tutor's feedback appears under the task.
+- **In class:** to show your written answer, press the 📷 button next to Send on the class board, take the photo and press **Send to class** — your tutor sees it straight away. Press **Reply** on the tutor's question first to attach it as your answer.
 - **Dictation (speak instead of typing):** tap into a text box, press the round 🎤 button on the right and speak. Say "full stop", "comma", "question mark" or "new line" for punctuation. Press it again to stop. (Your tablet keyboard's own 🎤 also works.)
 - **Online classes:**
   - Press **Join** on **Online Classes** (from 10 minutes before) and allow the camera and microphone.

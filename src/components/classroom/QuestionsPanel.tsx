@@ -13,8 +13,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   MessageSquare, StickyNote, Send, CornerDownRight, CheckCircle2, Trash2, X, Download, Loader2,
-  Layers, Target, FileText,
+  Layers, Target, FileText, Camera,
 } from 'lucide-react';
+import ScanCapture from '../scan/ScanCapture';
+import ScanGallery from '../scan/ScanGallery';
+import { deleteScanPages } from '../../lib/scans';
 import type { AppUser } from '../../lib/AuthContext';
 import {
   ClassMessage, MessageKind, SharedItem, MAX_MESSAGE_LENGTH, buildThreads, openQuestionCount, tallyResponses,
@@ -72,6 +75,7 @@ function Board({ classId, user, isHost, messages, boardError, onOpenInLearning }
   const [kind, setKind] = useState<'question' | 'comment'>('question');
   const [replyTo, setReplyTo] = useState<ClassMessage | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
   const threads = useMemo(() => buildThreads(messages), [messages]);
   const listRef = useRef<HTMLDivElement>(null);
   const count = Object.keys(messages).length;
@@ -108,6 +112,24 @@ function Board({ classId, user, isHost, messages, boardError, onOpenInLearning }
     }
   };
 
+  /** v1.5: post scanned pages (e.g. a handwritten answer) to the board. */
+  const sendScans = async (scanIds: string[], caption: string) => {
+    const message: ClassMessage = {
+      id: newMessageId(),
+      kind: replyTo ? 'reply' : 'scan',
+      text: caption.slice(0, MAX_MESSAGE_LENGTH),
+      authorEmail: user.email,
+      authorName: user.username || user.email,
+      authorRole: user.role,
+      createdAt: new Date().toISOString(),
+      replyTo: replyTo?.id,
+      scans: scanIds,
+    };
+    await postMessage(classId, message);
+    setReplyTo(null);
+    setScanning(false);
+  };
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   };
@@ -133,7 +155,7 @@ function Board({ classId, user, isHost, messages, boardError, onOpenInLearning }
               canModerate={canModerate(message)}
               onReply={() => setReplyTo(message)}
               onToggleAnswered={() => act(setAnswered(classId, message.id, !message.answered, user.username || user.email))}
-              onDelete={() => act(deleteMessage(classId, message.id))}
+              onDelete={() => act(deleteMessage(classId, message.id).then(() => deleteScanPages(message.scans)))}
               onAnswerQuiz={(opt) => act(answerSharedQuiz(classId, message.id, user.email, user.username || user.email, opt))}
               onOpenInLearning={onOpenInLearning}
             />
@@ -143,7 +165,7 @@ function Board({ classId, user, isHost, messages, boardError, onOpenInLearning }
                 <div className="flex-1">
                   <MessageCard
                     m={r} me={user} isHost={isHost} canModerate={canModerate(r)}
-                    onDelete={() => act(deleteMessage(classId, r.id))}
+                    onDelete={() => act(deleteMessage(classId, r.id).then(() => deleteScanPages(r.scans)))}
                     onOpenInLearning={onOpenInLearning}
                   />
                 </div>
@@ -181,10 +203,28 @@ function Board({ classId, user, isHost, messages, boardError, onOpenInLearning }
             placeholder={replyTo ? 'Write a reply…' : kind === 'question' ? 'Ask a question…' : 'Write a comment…'}
             className="flex-1 resize-none text-sm border border-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
           />
-          <button onClick={send} disabled={!text.trim()} aria-label="Send" className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg p-2.5">
-            <Send className="h-4 w-4" />
-          </button>
+          <div className="flex flex-col gap-1">
+            {/* v1.5: scan a handwritten answer with the camera */}
+            <button onClick={() => setScanning(true)} aria-label="Scan handwritten work" title="Scan handwritten work (camera)" className="border border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded-lg p-2">
+              <Camera className="h-4 w-4" />
+            </button>
+            <button onClick={send} disabled={!text.trim()} aria-label="Send" className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg p-2">
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
         </div>
+        {scanning && (
+          <ScanCapture
+            user={user}
+            title={replyTo ? 'Scan your answer' : 'Scan handwritten work'}
+            subtitle={replyTo ? `Answer to: ${replyTo.text || replyTo.share?.title || ''}` : 'It appears on the class board straight away'}
+            context={{ type: 'class', id: classId }}
+            withCaption
+            sendLabel="Send to class"
+            onClose={() => setScanning(false)}
+            onDone={sendScans}
+          />
+        )}
       </div>
     </div>
   );
@@ -222,6 +262,12 @@ function MessageCard({ m, me, isHost, canModerate, onReply, onToggleAnswered, on
       </div>
 
       {m.text && <div className="mt-0.5 text-slate-800 whitespace-pre-wrap break-words">{m.text}</div>}
+      {m.scans && m.scans.length > 0 && (
+        <div className="mt-1">
+          <div className="text-[11px] font-semibold text-indigo-700 flex items-center gap-1 mb-1"><Camera className="h-3.5 w-3.5" /> Scanned work · {m.scans.length} page{m.scans.length === 1 ? '' : 's'} — tap to enlarge</div>
+          <ScanGallery scanIds={m.scans} compact downloadName={`class-answer-${m.authorName}`} />
+        </div>
+      )}
       {m.share && <SharedItemView m={m} me={me} isHost={isHost} onAnswerQuiz={onAnswerQuiz} onOpenInLearning={onOpenInLearning} />}
 
       <div className="flex items-center gap-3 mt-1 text-[11px] font-semibold">

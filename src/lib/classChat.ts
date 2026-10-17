@@ -21,7 +21,7 @@ import {
 import { db } from './firebase';
 import { STORE_COLLECTION } from './storeKeys';
 
-export type MessageKind = 'question' | 'comment' | 'reply' | 'share';
+export type MessageKind = 'question' | 'comment' | 'reply' | 'share' | 'scan';
 export type ShareType = 'flashcard' | 'quiz' | 'note';
 
 /** A copy of a shared learning item, so everyone sees it instantly. */
@@ -52,6 +52,7 @@ export interface ClassMessage {
   answeredBy?: string;
   share?: SharedItem;              // kind 'share'
   responses?: Record<string, QuizResponse>; // shared quiz → answers by user key
+  scans?: string[];                // v1.5: scanned pages (handwritten answer) — see lib/scans.ts
 }
 
 export const MAX_MESSAGE_LENGTH = 1000;

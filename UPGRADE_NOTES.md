@@ -13,6 +13,24 @@ Free-tier use: each finished stroke is one small save; a busy class uses a
 few hundred of Firestore's 20,000 free daily writes.
 
 ## What's new
+- **Scan & submit homework (Tasks):** "Scan & submit" opens the camera on a
+  tablet/phone — one photo per page, rotate, "Clean" mode (white paper, dark
+  writing, like a scanner), reorder, or add photos / a small PDF (≤ ~650 KB)
+  from the gallery. The tutor sees thumbnails, opens pages full screen
+  (zoom, rotate, download) and can write feedback + "Mark reviewed". The
+  student can "Add more pages" until it is reviewed.
+  **Fix:** the old "Upload File" in Submit Work never saved the file (only
+  its name). It is replaced by Scan; old entries show a note to re-submit.
+- **Scan answers in class:** the 📷 button next to Send on the class board
+  scans a handwritten answer (optionally as a reply to the tutor's question,
+  with a note). It appears on the tutor's board straight away; tap to enlarge.
+- **Storage (free plan):** Firebase file Storage needs the paid plan, so each
+  page is compressed in the app and saved as its own Firestore document
+  `appStore/scan_<id>` (existing rules cover it). The free 1 GB holds several
+  thousand pages. Tasks keep only the list of page ids (new optional fields
+  `scanIds`, `submittedBy/At`, `reviewNote`, `reviewedBy/At`). Deleting a task
+  or a class-board message also deletes its pages. The Backup download
+  includes scanned pages (the file gets bigger).
 - **Study Notes:** the Topic is now optional ("Whole chapter"), the title is
   filled in automatically (sub-topic/topic/chapter + link type), and each
   note has **Edit** and **Delete** (tutor/admin). Existing notes keep their
@@ -85,13 +103,14 @@ New: src/lib/classroomLayout.ts, src/lib/classChat.ts, src/lib/classroomContent.
 src/lib/whiteboard.ts, src/components/classroom/Whiteboard.tsx,
 src/components/classroom/PresentedView.tsx, src/components/classroom/VideoControls.tsx,
 src/components/classroom/YouTubePlayer.tsx, src/lib/youtube.ts, src/lib/dictation.ts,
-src/components/DictationButton.tsx,
+src/components/DictationButton.tsx, src/lib/scans.ts, src/components/scan/ScanCapture.tsx,
+src/components/scan/ScanGallery.tsx,
 src/components/classroom/ResizeHandle.tsx, src/components/classroom/LearningPanel.tsx,
 src/components/classroom/QuestionsPanel.tsx, src/components/classroom/FlashcardDeck.tsx,
 src/components/classroom/QuizRunner.tsx
 Changed: src/pages/ClassRoom.tsx, src/components/ClassCard.tsx, src/pages/Backup.tsx,
 src/components/DailyFrame.tsx, api/video-room.ts (chat + screen share for everyone),
-src/pages/StudyNotes.tsx,
+src/pages/StudyNotes.tsx, src/pages/Tasks.tsx,
 src/components/Layout.tsx (v1.5 label), README.md, UserManual.md, UPGRADE_NOTES.md
 
 ---
