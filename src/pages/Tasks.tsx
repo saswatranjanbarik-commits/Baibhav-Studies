@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CheckSquare, Plus, Search, Filter, CheckCircle2, Circle, Calendar, Trash2, X, AlertCircle, Tag, Clock, Link as LinkIcon, FileText, Upload } from 'lucide-react';
 import { todayStr, parseDateStr } from '../lib/dates';
 import { Camera, MessageSquareText, HardDrive, Download, Eraser, Loader2 } from 'lucide-react';
@@ -74,6 +74,7 @@ export default function Tasks() {
   const [showCleanup, setShowCleanup] = useState(false);
   const [working, setWorking] = useState<string | null>(null); // task id being processed
   useEffect(() => listenToSubmissions((s) => { setSubs(s); setSubsError(null); }, setSubsError), []);
+
   useEffect(() => {
     if (!notice) return;
     const t = setTimeout(() => setNotice(null), 8000);
@@ -208,6 +209,17 @@ export default function Tasks() {
     });
     saveTasks(updatedTasks as Task[]);
   };
+
+  // Repair (tutor/admin, once per visit): a task with submitted work must be
+  // marked Completed in the task list too (fixes tasks whose status update
+  // was lost before v1.5's merge fix).
+  const repaired = useRef(false);
+  useEffect(() => {
+    if (isStudent || repaired.current || !tasks.length || !Object.keys(subs).length) return;
+    const stale = tasks.filter(t => subs[t.id] && t.status !== 'Completed');
+    repaired.current = true;
+    if (stale.length) saveTasks(tasks.map(t => (subs[t.id] && t.status !== 'Completed' ? { ...t, status: 'Completed' } : t)));
+  }, [tasks, subs, isStudent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = (id: string) => {
     const task = tasks.find(t => t.id === id);
