@@ -6,8 +6,10 @@
  */
 import React, { useState } from 'react';
 import { ExternalLink, Presentation, CheckCircle2, XCircle } from 'lucide-react';
-import type { PresentState } from '../../lib/classChat';
+import type { PresentState, MediaState } from '../../lib/classChat';
 import { embeddableUrl } from '../../lib/classroomContent';
+import { youTubeId } from '../../lib/youtube';
+import YouTubePlayer from './YouTubePlayer';
 import { Empty } from './FlashcardDeck';
 
 interface Props {
@@ -35,7 +37,7 @@ export default function PresentedView({ present, onBrowseMyself }: Props) {
         {!item ? (
           <Empty text={`${present.byName} is choosing what to show…`} />
         ) : item.type === 'note' ? (
-          <NoteView title={item.title} link={item.link} />
+          <NoteView title={item.title} link={item.link} media={present.media} />
         ) : item.type === 'flashcard' ? (
           <CardView front={item.front} back={item.back} flipped={!!present.flipped} />
         ) : (
@@ -47,8 +49,9 @@ export default function PresentedView({ present, onBrowseMyself }: Props) {
   );
 }
 
-function NoteView({ title, link }: { title: string; link?: string }) {
+function NoteView({ title, link, media }: { title: string; link?: string; media?: MediaState }) {
   const embed = embeddableUrl(link);
+  const ytId = youTubeId(link);
   return (
     <div className="h-full flex flex-col">
       <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-slate-200">
@@ -59,7 +62,10 @@ function NoteView({ title, link }: { title: string; link?: string }) {
           </a>
         )}
       </div>
-      {embed ? (
+      {ytId ? (
+        // Plays, pauses and jumps together with the tutor; sound plays on this device.
+        <div className="flex-1 min-h-0"><YouTubePlayer videoId={ytId} title={title} follow={media || null} /></div>
+      ) : embed ? (
         <iframe title={title} src={embed} className="flex-1 w-full border-0 bg-slate-50" allow="autoplay; fullscreen" />
       ) : (
         <Empty text="This note can't be shown inside the app. Open it in a new tab, or ask your tutor to share their screen." />

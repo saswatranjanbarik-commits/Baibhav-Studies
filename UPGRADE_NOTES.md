@@ -13,6 +13,28 @@ Free-tier use: each finished stroke is one small save; a busy class uses a
 few hundred of Firestore's 20,000 free daily writes.
 
 ## What's new
+- **Study Notes:** the Topic is now optional ("Whole chapter"), the title is
+  filled in automatically (sub-topic/topic/chapter + link type), and each
+  note has **Edit** and **Delete** (tutor/admin). Existing notes keep their
+  titles and fields; notes without a topic simply have an empty topic.
+- **Dictation:** tap into any text box (Daily Log, class board, My notes,
+  tasks, whiteboard text…) and a 🎤 button appears on the right — speak and
+  the words are typed. Say "full stop", "comma", "question mark", "new line",
+  "new paragraph". Languages: English (India/UK/US), Hindi. Uses the browser's
+  free speech recognition (Chrome/Edge/Android/Safari; needs internet; not in
+  Firefox). On a tablet, dictating during a video class may not work while
+  the call is using the microphone.
+- **Tutor controls the class-room layout:** only tutor/admin can switch
+  windows on/off or resize them; the student's class room follows the
+  tutor's layout automatically (narrow screens still show tabs).
+- **Presenting YouTube videos:** play, pause and jumps are copied to the
+  student, and the sound plays on the student's own device. If the student's
+  browser blocks starting the sound, a "Tap to play with your tutor" button
+  appears once.
+- **Scrolling PDFs / Google Drive files** can't be copied into another
+  person's screen (those sites don't allow it) — the tutor sees a reminder
+  to use **Share screen** for that. Share screen now asks for sound too: in
+  Chrome/Edge choose the **tab** and tick **"Also share tab audio"**.
 - **Class room in up to four windows**
   1. **Video** (as before)
   2. **Questions** — *Class board* (live, shared): questions and comments,
@@ -62,11 +84,14 @@ few hundred of Firestore's 20,000 free daily writes.
 New: src/lib/classroomLayout.ts, src/lib/classChat.ts, src/lib/classroomContent.ts,
 src/lib/whiteboard.ts, src/components/classroom/Whiteboard.tsx,
 src/components/classroom/PresentedView.tsx, src/components/classroom/VideoControls.tsx,
+src/components/classroom/YouTubePlayer.tsx, src/lib/youtube.ts, src/lib/dictation.ts,
+src/components/DictationButton.tsx,
 src/components/classroom/ResizeHandle.tsx, src/components/classroom/LearningPanel.tsx,
 src/components/classroom/QuestionsPanel.tsx, src/components/classroom/FlashcardDeck.tsx,
 src/components/classroom/QuizRunner.tsx
 Changed: src/pages/ClassRoom.tsx, src/components/ClassCard.tsx, src/pages/Backup.tsx,
 src/components/DailyFrame.tsx, api/video-room.ts (chat + screen share for everyone),
+src/pages/StudyNotes.tsx,
 src/components/Layout.tsx (v1.5 label), README.md, UserManual.md, UPGRADE_NOTES.md
 
 ---

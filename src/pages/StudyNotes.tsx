@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Paperclip, Plus, X, Search, Filter, ExternalLink, FileText, File as FileIcon, Link as LinkIcon, FileImage } from 'lucide-react';
+import { Paperclip, Plus, X, Search, Filter, ExternalLink, FileText, File as FileIcon, Link as LinkIcon, FileImage, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { todayStr } from '../lib/dates';
 
@@ -24,6 +24,8 @@ export default function StudyNotes() {
   const isStudent = currentUser?.role === 'Student';
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  /** v1.5: id of the note being edited (null = adding a new one). */
+  const [editingId, setEditingId] = useState<string | null>(null);
   
   // Syllabus data to populate dropdowns
   const [syllabus, setSyllabus] = useState<any[]>([]);
@@ -55,31 +57,67 @@ export default function StudyNotes() {
   const activeChapter = activeSubject?.chapters?.find((c: any) => c.id === newNote.chapterId);
   const activeTopic = activeChapter?.topics?.find((t: any) => t.id === newNote.topicId);
 
+  /**
+   * v1.5: the title is no longer typed in — it is made from the syllabus
+   * location (sub-topic, topic or chapter) and the link type. Existing notes
+   * keep their title unless their location is changed.
+   */
+  const makeTitle = () => {
+    const subTopicName = activeTopic?.subTopics?.find((st: any) => st.id === newNote.subTopicId)?.name;
+    const place = subTopicName || activeTopic?.name || (activeChapter?.name ? `${activeChapter.name} (chapter notes)` : '') || activeSubject?.name || 'Study material';
+    return `${place} – ${newNote.type || 'Link'}`;
+  };
+
+  const closeForm = () => {
+    setShowAdd(false);
+    setEditingId(null);
+    setNewNote({ type: 'Google Drive' });
+  };
+
+  const openEdit = (note: StudyNote) => {
+    setNewNote({ ...note });
+    setEditingId(note.id);
+    setShowAdd(true);
+  };
+
+  const handleDelete = (note: StudyNote) => {
+    if (!window.confirm(`Delete "${note.title}"? This removes the link from EduTrack (the file itself is not touched).`)) return;
+    saveNotes(notes.filter((n) => n.id !== note.id));
+  };
+
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newNote.subjectId || !newNote.chapterId || !newNote.topicId || !newNote.title || !newNote.link) return;
+    // Topic is optional (v1.5); subject, chapter and link are needed.
+    if (!newNote.subjectId || !newNote.chapterId || !newNote.link) return;
+
+    const existing = editingId ? notes.find((n) => n.id === editingId) : undefined;
+    const sameLocation = existing
+      && existing.subjectId === newNote.subjectId
+      && existing.chapterId === newNote.chapterId
+      && (existing.topicId || '') === (newNote.topicId || '')
+      && (existing.subTopicId || '') === (newNote.subTopicId || '')
+      && existing.type === newNote.type;
 
     const note: StudyNote = {
-      id: Date.now().toString(),
+      id: existing?.id || Date.now().toString(),
       subjectId: newNote.subjectId,
       subjectName: activeSubject?.name || '',
       chapterId: newNote.chapterId,
       chapterName: activeChapter?.name || '',
-      topicId: newNote.topicId,
+      topicId: newNote.topicId || '',
       topicName: activeTopic?.name || '',
-      subTopicId: newNote.subTopicId,
+      subTopicId: newNote.subTopicId || undefined,
       subTopicName: activeTopic?.subTopics?.find((st: any) => st.id === newNote.subTopicId)?.name || '',
-      title: newNote.title,
+      title: sameLocation && existing?.title ? existing.title : makeTitle(),
       type: newNote.type || 'Link',
       link: newNote.link,
-      dateAdded: todayStr()
+      dateAdded: existing?.dateAdded || todayStr()
     };
+    if (note.subTopicId === undefined) delete note.subTopicId;
 
-    saveNotes([note, ...notes]);
-    setShowAdd(false);
-    setNewNote({
-      type: 'Google Drive'
-    });
+    // Editing keeps the note's place in the list; a new note goes on top.
+    saveNotes(existing ? notes.map((n) => (n.id === existing.id ? note : n)) : [note, ...notes]);
+    closeForm();
   };
 
   const getIconForType = (type: string) => {
@@ -193,7 +231,7 @@ export default function StudyNotes() {
                       <div className="text-sm text-slate-700">{note.chapterName}</div>
                     </td>
                     <td className="p-4">
-                      <div className="text-sm font-semibold text-slate-800">{note.topicName}</div>
+                      <div className="text-sm font-semibold text-slate-800">{note.topicName || <span className="text-slate-400 font-normal">Whole chapter</span>}</div>
                       {note.subTopicName && (
                         <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                           <div className="w-1 h-1 rounded-full bg-slate-400"></div> {note.subTopicName}
@@ -205,7 +243,25 @@ export default function StudyNotes() {
                         {note.type}
                       </span>
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right whitespace-nowrap">
+                      {!isStudent && (
+                        <>
+                          <button
+                            onClick={() => openEdit(note)}
+                            title="Edit" aria-label={`Edit ${note.title}`}
+                            className="inline-flex items-center p-1.5 mr-1 text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(note)}
+                            title="Delete" aria-label={`Delete ${note.title}`}
+                            className="inline-flex items-center p-1.5 mr-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
                       <a 
                         href={note.link} 
                         target="_blank" 
@@ -227,8 +283,8 @@ export default function StudyNotes() {
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="text-lg font-bold text-slate-900">Add Study Material</h3>
-              <button onClick={() => setShowAdd(false)} className="text-slate-400 hover:text-slate-600">
+              <h3 className="text-lg font-bold text-slate-900">{editingId ? 'Edit Study Material' : 'Add Study Material'}</h3>
+              <button onClick={closeForm} className="text-slate-400 hover:text-slate-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -267,15 +323,14 @@ export default function StudyNotes() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Topic *</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Topic (Optional)</label>
                   <select
-                    required
                     disabled={!activeChapter}
                     value={newNote.topicId || ''}
                     onChange={e => setNewNote({ ...newNote, topicId: e.target.value, subTopicId: '' })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white disabled:bg-slate-50 disabled:text-slate-400"
                   >
-                    <option value="">Select Topic...</option>
+                    <option value="">Whole chapter (no topic)</option>
                     {activeChapter?.topics?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
@@ -297,18 +352,6 @@ export default function StudyNotes() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div className="sm:col-span-2">
                   <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Material Details</h4>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Material Title *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newNote.title || ''}
-                    onChange={e => setNewNote({...newNote, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="e.g. Chapter 1 Summary Notes"
-                  />
                 </div>
 
                 <div>
@@ -342,7 +385,7 @@ export default function StudyNotes() {
               <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowAdd(false)}
+                  onClick={closeForm}
                   className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg"
                 >
                   Cancel
@@ -351,7 +394,7 @@ export default function StudyNotes() {
                   type="submit"
                   className="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
                 >
-                  Save Material
+                  {editingId ? 'Save Changes' : 'Save Material'}
                 </button>
               </div>
             </form>
