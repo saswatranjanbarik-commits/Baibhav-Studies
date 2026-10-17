@@ -1,9 +1,10 @@
 /**
  * Merge rules used when saving to the cloud (unchanged since v1.1).
  *
- *  - Arrays of {id} objects: this device's edits win; items this device saw
- *    and removed are deleted; items added elsewhere that this device never
- *    saw are KEPT.
+ *  - Arrays of {id} objects: items this device CHANGED take this device's
+ *    version; items it did not change keep the cloud's (possibly newer)
+ *    version (v1.5); items this device saw and removed are deleted; items
+ *    added elsewhere that this device never saw are KEPT.
  *  - Arrays of plain values: union.
  *  - Plain objects: shallow merge.
  *  - Anything else: the new value wins.
@@ -26,6 +27,17 @@ export function isIdObjectArray(a: any[], b: any[]): boolean {
  *  - Plain objects: shallow merge.
  *  - Anything else: the new value wins.
  */
+/** Deep equality that ignores the order of object keys. */
+export function sameValue(a: any, b: any): boolean {
+  return stableStringify(a) === stableStringify(b);
+}
+
+function stableStringify(v: any): string {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'undefined';
+  if (Array.isArray(v)) return `[${v.map(stableStringify).join(',')}]`;
+  return `{${Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${stableStringify(v[k])}`).join(',')}}`;
+}
+
 export function mergeValue(existingValue: any, newVal: any, lastKnownValue: any): any {
   if (existingValue === undefined) return newVal;
 
@@ -35,8 +47,9 @@ export function mergeValue(existingValue: any, newVal: any, lastKnownValue: any)
     }
 
     const lastKnownIds = new Set<string>();
+    const lastKnownMap = new Map<string, any>();
     (Array.isArray(lastKnownValue) ? lastKnownValue : []).forEach((item: any) => {
-      if (item && item.id) lastKnownIds.add(item.id);
+      if (item && item.id) { lastKnownIds.add(item.id); lastKnownMap.set(item.id, item); }
     });
 
     const userNewMap = new Map<string, any>();
@@ -46,7 +59,15 @@ export function mergeValue(existingValue: any, newVal: any, lastKnownValue: any)
     existingValue.forEach((item: any) => {
       if (!item || !item.id) return;
       if (userNewMap.has(item.id)) {
-        mergedMap.set(item.id, userNewMap.get(item.id)); // user's version wins
+        const mine = userNewMap.get(item.id);
+        const base = lastKnownMap.get(item.id);
+        // v1.5: if this device did NOT change the item since it last saw the
+        // cloud, keep the cloud's version — it may hold a newer change from
+        // another device (e.g. the student marking a task done). Before, every
+        // item in this device's copy overwrote the cloud, so a device with a
+        // slightly older copy could silently undo other people's changes.
+        if (base !== undefined && sameValue(mine, base)) mergedMap.set(item.id, item);
+        else mergedMap.set(item.id, mine); // this device changed it — its version wins
       } else if (!lastKnownIds.has(item.id)) {
         mergedMap.set(item.id, item); // added elsewhere; user never saw it — keep
       }

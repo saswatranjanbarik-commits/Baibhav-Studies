@@ -35,6 +35,7 @@ export interface SharedItem {
   options?: string[];
   correctOptionIndex?: number;
   link?: string;           // study note
+  adhoc?: boolean;         // v1.5: a link pasted in class (not a saved study note)
 }
 
 export interface QuizResponse { option: number; name: string; at: string }

@@ -76,7 +76,7 @@ export function matchesSearch(query: string, ...fields: (string | undefined)[]):
  *   YouTube → the embed player
  *   Direct .pdf links → as is (some sites still block this)
  */
-export function embeddableUrl(link: string | undefined): string | null {
+export function embeddableUrl(link: string | undefined, opts?: { anyWebsite?: boolean }): string | null {
   if (!link) return null;
   let url: URL;
   try { url = new URL(link.trim()); } catch { return null; }
@@ -101,5 +101,28 @@ export function embeddableUrl(link: string | undefined): string | null {
     return id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}` : null;
   }
   if (/\.pdf$/i.test(url.pathname)) return url.toString();
+  // A link the tutor pasted in class: try showing any secure website (some
+  // sites refuse to be shown inside other apps — the page then stays blank).
+  if (opts?.anyWebsite && url.protocol === 'https:') return url.toString();
   return null;
+}
+
+/** Tidy a pasted link: add https:// if missing; null if it isn't a web link. */
+export function normaliseLink(input: string): string | null {
+  const t = input.trim();
+  if (!t) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `https://${t}`;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    if (!u.hostname.includes('.')) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** A short title for a link, e.g. "youtube.com". */
+export function linkTitle(link: string): string {
+  try { return new URL(link).hostname.replace(/^www\./, ''); } catch { return link; }
 }

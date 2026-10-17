@@ -13,6 +13,38 @@ Free-tier use: each finished stroke is one small save; a busy class uses a
 few hundred of Firestore's 20,000 free daily writes.
 
 ## What's new
+- **Sync fix (important):** when a device saved a list (e.g. tasks), its copy
+  of EVERY item overwrote the cloud — so a device holding a slightly older
+  copy could silently undo another person's change (this is how a submitted
+  task went back to "Pending"). Now an item is only overwritten if this
+  device actually changed it; untouched items keep the cloud's newer version.
+  (src/lib/syncMerge.ts — no data or field names changed.)
+- **Dashboard "Pending Tasks"** now uses the same rule as the Tasks page (a
+  task with submitted work counts as done). Opening Tasks as tutor/admin also
+  repairs tasks that have a submission but were still marked Pending.
+- **Present a link in class:** in the class room's Learning → Notes, paste
+  any link (website, YouTube, Google Drive…) and press **Open**; with
+  **Present to class** on, the student sees it too (YouTube plays in sync).
+  Some websites refuse to be shown inside other apps — use New tab or Share
+  screen for those. **Save to notes** keeps the link in Study Notes for the
+  class's chapter.
+- **Submissions saved directly (fix):** a scanned submission is now saved
+  straight to its own cloud record `appStore/task_submissions` (one entry per
+  task) and confirmed by the server before "✓ Submitted and saved" shows —
+  instead of travelling with the general background sync of the task list
+  (where a student's submission could go missing). The tutor's Tasks page
+  updates live; a submitted task always shows as completed.
+- **Better scanning:** the page edges are found automatically and the page is
+  straightened like a scanner app; **Adjust corners** lets you drag the four
+  corners onto the page; **Whole photo** undoes it. **Size**: Small (saves
+  space) / Standard / Sharp.
+- **PDF:** **Download PDF** puts all pages of a submission into one PDF file
+  (made on the device; pages are stored once, already compressed).
+- **Free space (tutor/admin):** on a task, or in **Submissions: … MB** at the
+  top of Tasks — see the space used, **Download & free space** (PDF first,
+  then the pages are removed; the task stays completed with "submitted by …
+  on …, pages removed on …"), **Free space**, and delete completed tasks that
+  were due more than 30 days ago.
 - **Scan & submit homework (Tasks):** "Scan & submit" opens the camera on a
   tablet/phone — one photo per page, rotate, "Clean" mode (white paper, dark
   writing, like a scanner), reorder, or add photos / a small PDF (≤ ~650 KB)
@@ -104,7 +136,8 @@ src/lib/whiteboard.ts, src/components/classroom/Whiteboard.tsx,
 src/components/classroom/PresentedView.tsx, src/components/classroom/VideoControls.tsx,
 src/components/classroom/YouTubePlayer.tsx, src/lib/youtube.ts, src/lib/dictation.ts,
 src/components/DictationButton.tsx, src/lib/scans.ts, src/components/scan/ScanCapture.tsx,
-src/components/scan/ScanGallery.tsx,
+src/components/scan/ScanGallery.tsx, src/lib/submissions.ts, src/lib/scanGeometry.ts,
+src/lib/pdfBuilder.ts, src/lib/syncMerge.ts, src/pages/Dashboard.tsx,
 src/components/classroom/ResizeHandle.tsx, src/components/classroom/LearningPanel.tsx,
 src/components/classroom/QuestionsPanel.tsx, src/components/classroom/FlashcardDeck.tsx,
 src/components/classroom/QuizRunner.tsx

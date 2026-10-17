@@ -9,6 +9,7 @@ import { loadRevisionSettings, isCurrentRevision } from '../lib/revisionReset';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Star, BarChart3, CheckCircle2, Clock, Calendar as CalendarIcon, RefreshCw, Trophy, Target, Sparkles, Globe2, Edit3, X } from 'lucide-react';
 import { todayStr, toDateStr, parseDateStr } from '../lib/dates';
+import { Submission, listenToSubmissions } from '../lib/submissions';
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
@@ -20,6 +21,14 @@ export default function Dashboard() {
   const [topicsLogged, setTopicsLogged] = React.useState(0);
   const [revisionsDue, setRevisionsDue] = React.useState(0);
   const [pendingTasks, setPendingTasks] = React.useState(0);
+  // v1.5: a task with submitted work counts as done (same rule as the Tasks page).
+  const [taskList, setTaskList] = React.useState<any[]>([]);
+  const [subs, setSubs] = React.useState<Record<string, Submission>>({});
+  React.useEffect(() => listenToSubmissions(setSubs, () => {}), []);
+  React.useEffect(() => {
+    setPendingTasks(taskList.filter((t: any) =>
+      (t.status === 'Pending' || t.status === 'Overdue') && !subs[t.id] && !(t.scanIds?.length)).length);
+  }, [taskList, subs]);
   const [overallProgress, setOverallProgress] = React.useState(0);
   const [recentTopics, setRecentTopics] = React.useState<any[]>([]);
   const [subjectProgress, setSubjectProgress] = React.useState<any[]>([]);
@@ -60,8 +69,7 @@ export default function Dashboard() {
       const savedTasks = localStorage.getItem('dugu_tasks');
       if (savedTasks) {
         const tasks = JSON.parse(savedTasks);
-        const pending = tasks.filter((t: any) => t.status === 'Pending' || t.status === 'Overdue');
-        setPendingTasks(pending.length);
+        setTaskList(Array.isArray(tasks) ? tasks : []);
       }
     };
     

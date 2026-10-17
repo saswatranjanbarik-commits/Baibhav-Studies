@@ -37,7 +37,8 @@ As a Teacher, your primary role is to manage the study plan, evaluate students, 
   - Use the **Daily Log** to record what was taught in class. Your logs will automatically reflect in the Calendar and update the Subject Progress.
 - **Study Materials & Flashcards:**
   - Go to **Flashcards** to create flashcards and quizzes for chapters or topics.
-  - **Homework submissions:** on **Tasks**, tap a submitted page to view it full screen (zoom, rotate, download). Write feedback and press **Mark reviewed**.
+  - **Homework submissions:** on **Tasks**, tap a submitted page to view it full screen (zoom, rotate, download) or press **Download PDF** for all pages in one file. Write feedback and press **Mark reviewed**.
+  - **Saving space:** press **Submissions: … MB** at the top of Tasks. Use **Download & free space** (keeps a PDF on your computer, removes the pages from EduTrack, the task stays completed), or delete old completed tasks.
   - **Scanned answers in class** appear on the class board — tap to enlarge.
   - **Study Notes:** pick subject and chapter (topic is optional) and paste the link — the title is made automatically. Use ✏️ to edit and 🗑 to delete a note.
   - Access **Study Notes** and **Team Notes** to share important information and collaborative materials with students.
@@ -52,6 +53,7 @@ As a Teacher, your primary role is to manage the study plan, evaluate students, 
   - **Layout:** only you (tutor/admin) can switch windows on/off and resize them — the student's screen follows your layout.
   - **YouTube in Present mode:** open a YouTube study note while presenting; when you play, pause or jump, the student's video does the same (sound plays on their device).
   - **PDF / Google Drive files:** the student sees the same file, but not your scrolling — use **Share screen**, pick this tab and tick **Also share tab audio**.
+  - **Present a link:** in **Learning → Notes**, paste a website / YouTube / Google Drive link at the top and press **Open**. With **Present to class** on, the student sees the same page. **Save to notes** keeps it in Study Notes.
   - **Present to class:** at the top of the **Learning** window press **Present to class**. The student's Learning window now shows exactly what you open — the note, the flashcard (and when you flip it), the quiz question (and when you show the answer). Press **Stop presenting** when done. To show scrolling inside a document, use **Share screen** instead.
   - **Share screen / Chat:** buttons at the top of the class room (work for the student too). Screen sharing needs a laptop or computer.
   - **Whiteboard:** draw or write with the mouse, finger or stylus — the student sees it within a second and can draw too. Pick a tool (pen, highlighter, line, box, circle, text, eraser), colour and size; **Undo** removes your own last stroke; **+** adds a page (everyone moves to it); the bin clears the page for everyone; the download button saves the page as a picture.
@@ -85,7 +87,7 @@ As a Student, you can track your study progress, complete tasks, and review mate
 - **Learning Materials:**
   - Click on the **Syllabus** to see what you need to study. Expand chapters/topics to view activity logs and click the link to access Flashcards & Quizzes for that section.
   - Use **Flashcards** and **Study Notes** to revise for your exams.
-- **Submitting homework:** on **Tasks**, press **Scan & submit**, take a photo of each page (lay it flat, good light, fill the screen), then press **Submit**. Use **Add more pages** if you forgot one. Your tutor's feedback appears under the task.
+- **Submitting homework:** on **Tasks**, press **Scan & submit**, take a photo of each page (lay it flat on a darker table, good light). The app finds the page edges and straightens it — use **Adjust corners** if it missed a corner. Press **Submit** and wait for **✓ Submitted and saved**. Use **Add more pages** if you forgot one. Your tutor's feedback appears under the task.
 - **In class:** to show your written answer, press the 📷 button next to Send on the class board, take the photo and press **Send to class** — your tutor sees it straight away. Press **Reply** on the tutor's question first to attach it as your answer.
 - **Dictation (speak instead of typing):** tap into a text box, press the round 🎤 button on the right and speak. Say "full stop", "comma", "question mark" or "new line" for punctuation. Press it again to stop. (Your tablet keyboard's own 🎤 also works.)
 - **Online classes:**

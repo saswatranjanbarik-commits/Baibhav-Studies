@@ -12,12 +12,14 @@
  * "Browse myself" / "Follow" at any time.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Layers, Target, Search, ExternalLink, ArrowLeft, Presentation, Square } from 'lucide-react';
+import { FileText, Layers, Target, Search, ExternalLink, ArrowLeft, Presentation, Square, Link as LinkIcon, BookmarkPlus } from 'lucide-react';
+import { todayStr } from '../../lib/dates';
 import { STORE_KEYS } from '../../lib/storeKeys';
 import { useStoredData } from '../../lib/useStoredData';
 import type { OnlineClass } from '../../lib/classes';
 import {
   ContentScope, SCOPE_LABELS, availableScopes, defaultScope, scopeFilter, matchesSearch, embeddableUrl,
+  normaliseLink, linkTitle,
 } from '../../lib/classroomContent';
 import type { SharedItem, PresentView, PresentState, MediaState } from '../../lib/classChat';
 import { youTubeId } from '../../lib/youtube';
@@ -34,6 +36,8 @@ export interface LearningFocus { tab: LearningTab; itemId: string; nonce: number
 interface StudyNoteLike {
   id: string; title: string; type?: string; link: string;
   subjectId?: string; chapterId?: string; topicId?: string; topicName?: string; chapterName?: string;
+  /** v1.5: a link pasted in class (not a saved study note). */
+  adhoc?: boolean;
 }
 interface LearningItemLike {
   id: string; type: 'flashcard' | 'quiz';
@@ -122,7 +126,7 @@ export default function LearningPanel({
   const reportRef = useRef(onPresentView);
   reportRef.current = onPresentView;
   const noteItem: SharedItem | undefined = openNote
-    ? { type: 'note', itemId: openNote.id, title: openNote.title, link: openNote.link }
+    ? { type: 'note', itemId: openNote.id, title: openNote.title, link: openNote.link, adhoc: openNote.adhoc }
     : undefined;
   const shown: PresentView =
     tab === 'notes' ? { tab, item: noteItem, label: openNote ? '' : 'Notes list', media: openNote ? media : undefined }
@@ -132,6 +136,27 @@ export default function LearningPanel({
   useEffect(() => {
     if (presenting) reportRef.current?.(shown);
   }, [presenting, shownKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // v1.5: tutor/admin can keep a pasted link as a study note for this class's chapter.
+  const canSaveLink = !!onTogglePresent && !!cls?.subjectId && !!cls?.chapterId;
+  const saveLinkAsNote = (note: StudyNoteLike) => {
+    if (!cls?.subjectId || !cls.chapterId) return false;
+    let list: any[] = [];
+    try { list = JSON.parse(localStorage.getItem(STORE_KEYS.studyNotes) || '[]'); } catch { list = []; }
+    if (!Array.isArray(list)) list = [];
+    if (list.some((n) => n.link === note.link && n.chapterId === cls.chapterId)) return true; // already saved
+    const topic = (cls.plannedTopics || [])[0];
+    list.unshift({
+      id: Date.now().toString(),
+      subjectId: cls.subjectId, subjectName: cls.subjectName || '',
+      chapterId: cls.chapterId, chapterName: cls.chapterName || '',
+      topicId: topic?.topicId || '', topicName: topic?.name || '',
+      title: `${topic?.name || cls.chapterName || note.title} – ${note.title}`,
+      type: 'Link', link: note.link, dateAdded: todayStr(),
+    });
+    localStorage.setItem(STORE_KEYS.studyNotes, JSON.stringify(list)); // synced like any study note
+    return true;
+  };
 
   const counts: Record<LearningTab, number> = { notes: visibleNotes.length, flashcards: cards.length, quiz: questions.length };
   const scopes = availableScopes(cls);
@@ -205,8 +230,14 @@ export default function LearningPanel({
 
       <div className="flex-1 min-h-0 overflow-hidden">
         {tab === 'notes' && (openNote
-          ? <NoteViewer note={openNote} onBack={() => setOpenNote(null)} onShare={onShare} presenting={!!presenting} onMedia={setMedia} />
-          : <NotesList notes={visibleNotes} onOpen={setOpenNote} />)}
+          ? <NoteViewer note={openNote} onBack={() => setOpenNote(null)} onShare={onShare} presenting={!!presenting} onMedia={setMedia} onSaveLink={canSaveLink ? saveLinkAsNote : undefined} />
+          : (
+            <div className="h-full flex flex-col">
+              {/* v1.5: open (and present) any web / YouTube / Google Drive link */}
+              <LinkBar onOpen={(url) => setOpenNote({ id: `link-${Date.now()}`, title: linkTitle(url), link: url, type: 'Link', adhoc: true })} />
+              <div className="flex-1 min-h-0"><NotesList notes={visibleNotes} onOpen={setOpenNote} /></div>
+            </div>
+          ))}
         {tab === 'flashcards' && (
           <FlashcardDeck
             cards={cards}
@@ -253,12 +284,15 @@ function NotesList({ notes, onOpen }: { notes: StudyNoteLike[]; onOpen: (n: Stud
   );
 }
 
-function NoteViewer({ note, onBack, onShare, presenting, onMedia }: {
+function NoteViewer({ note, onBack, onShare, presenting, onMedia, onSaveLink }: {
   note: StudyNoteLike; onBack: () => void; onShare?: (item: SharedItem) => void;
   presenting: boolean; onMedia: (m: MediaState) => void;
+  onSaveLink?: (note: StudyNoteLike) => boolean;
 }) {
-  const embed = embeddableUrl(note.link);
+  const embed = embeddableUrl(note.link, { anyWebsite: note.adhoc });
+  const knownSite = !!embeddableUrl(note.link);
   const ytId = youTubeId(note.link);
+  const [saved, setSaved] = useState(false);
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-slate-200 shrink-0">
@@ -267,14 +301,29 @@ function NoteViewer({ note, onBack, onShare, presenting, onMedia }: {
         </button>
         <span className="flex-1 min-w-0 truncate text-sm font-semibold text-slate-800">{note.title}</span>
         {onShare && (
-          <button onClick={() => onShare({ type: 'note', itemId: note.id, title: note.title, link: note.link })} className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100" title="Put this note on the class board">
+          <button onClick={() => onShare({ type: 'note', itemId: note.id, title: note.title, link: note.link, adhoc: note.adhoc })} className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100" title="Put this note on the class board">
             Show to class
+          </button>
+        )}
+        {note.adhoc && onSaveLink && (
+          <button
+            onClick={() => setSaved(onSaveLink(note))}
+            disabled={saved}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 rounded px-2 py-1 hover:bg-emerald-100 disabled:opacity-60"
+            title="Keep this link in Study Notes for this chapter"
+          >
+            <BookmarkPlus className="h-3.5 w-3.5" /> {saved ? 'Saved' : 'Save to notes'}
           </button>
         )}
         <a href={note.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 border border-slate-300 rounded px-2 py-1 hover:bg-slate-50">
           <ExternalLink className="h-3.5 w-3.5" /> New tab
         </a>
       </div>
+      {note.adhoc && !ytId && !knownSite && (
+        <div className="shrink-0 text-[11px] px-2 py-1 bg-slate-50 text-slate-600 border-b border-slate-200">
+          If this stays blank, the website doesn't allow being shown inside other apps — use <strong>New tab</strong>, or <strong>Share screen</strong> to show it to the class.
+        </div>
+      )}
       {presenting && !ytId && embed && (
         <div className="shrink-0 text-[11px] px-2 py-1 bg-amber-50 text-amber-800 border-b border-amber-200">
           The class sees this file, but scrolling and page turns inside it can't be copied to their screen.
@@ -292,5 +341,33 @@ function NoteViewer({ note, onBack, onShare, presenting, onMedia }: {
         <Empty text="This link can't be shown inside the app (the site doesn't allow it). Use “New tab” — the class keeps running here." />
       )}
     </div>
+  );
+}
+
+/** v1.5: paste a link (website, YouTube, Google Drive…) and open it here — and present it. */
+function LinkBar({ onOpen }: { onOpen: (url: string) => void }) {
+  const [text, setText] = useState('');
+  const [error, setError] = useState(false);
+  const open = (e: React.FormEvent) => {
+    e.preventDefault();
+    const url = normaliseLink(text);
+    if (!url) { setError(true); return; }
+    setError(false);
+    setText('');
+    onOpen(url);
+  };
+  return (
+    <form onSubmit={open} className="shrink-0 flex items-center gap-2 px-2 py-1.5 border-b border-slate-100 bg-indigo-50/40">
+      <LinkIcon className="h-4 w-4 text-indigo-500 shrink-0" />
+      <input
+        value={text}
+        onChange={(e) => { setText(e.target.value); setError(false); }}
+        placeholder="Paste a link to open / present (website, YouTube, Google Drive…)"
+        className={`flex-1 min-w-0 text-xs border rounded-md px-2 py-1.5 ${error ? 'border-red-400' : 'border-slate-300'}`}
+        aria-label="Link to open"
+        inputMode="url"
+      />
+      <button type="submit" disabled={!text.trim()} className="text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 rounded-md px-3 py-1.5">Open</button>
+    </form>
   );
 }

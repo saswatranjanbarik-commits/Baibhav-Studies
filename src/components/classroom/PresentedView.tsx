@@ -37,7 +37,7 @@ export default function PresentedView({ present, onBrowseMyself }: Props) {
         {!item ? (
           <Empty text={`${present.byName} is choosing what to show…`} />
         ) : item.type === 'note' ? (
-          <NoteView title={item.title} link={item.link} media={present.media} />
+          <NoteView title={item.title} link={item.link} media={present.media} adhoc={item.adhoc} />
         ) : item.type === 'flashcard' ? (
           <CardView front={item.front} back={item.back} flipped={!!present.flipped} />
         ) : (
@@ -49,8 +49,8 @@ export default function PresentedView({ present, onBrowseMyself }: Props) {
   );
 }
 
-function NoteView({ title, link, media }: { title: string; link?: string; media?: MediaState }) {
-  const embed = embeddableUrl(link);
+function NoteView({ title, link, media, adhoc }: { title: string; link?: string; media?: MediaState; adhoc?: boolean }) {
+  const embed = embeddableUrl(link, { anyWebsite: adhoc });
   const ytId = youTubeId(link);
   return (
     <div className="h-full flex flex-col">
