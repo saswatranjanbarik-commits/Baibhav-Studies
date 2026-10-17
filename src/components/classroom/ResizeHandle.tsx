@@ -18,9 +18,11 @@ interface Props {
   onChange: (ratio: number) => void;
   onReset: () => void;
   label: string;
+  /** v1.5: students can't resize (the tutor arranges the windows) — shows a plain divider. */
+  disabled?: boolean;
 }
 
-export default function ResizeHandle({ direction, containerRef, ratio, onChange, onReset, label }: Props) {
+export default function ResizeHandle({ direction, containerRef, ratio, onChange, onReset, label, disabled }: Props) {
   const [dragging, setDragging] = useState(false);
   const lastTap = useRef(0);
   const isRow = direction === 'row';
@@ -53,6 +55,10 @@ export default function ResizeHandle({ direction, containerRef, ratio, onChange,
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { onChange(clampRatio(ratio + step)); e.preventDefault(); }
     if (e.key === 'Home' || e.key === 'Enter') { onReset(); e.preventDefault(); }
   };
+
+  if (disabled) {
+    return <div aria-hidden="true" className={`shrink-0 bg-slate-700 ${isRow ? 'w-1' : 'h-1'}`} />;
+  }
 
   return (
     <div

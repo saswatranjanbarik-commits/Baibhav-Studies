@@ -6,6 +6,7 @@ import { useAuth } from '../lib/AuthContext';
 import { SyncBadge, SyncBanner } from './SyncStatusBar';
 import HeaderClock from './HeaderClock';
 import ReminderScheduler from './ReminderScheduler';
+import DictationButton from './DictationButton';
 import { usePresenceHeartbeat } from '../lib/presence';
 
 export default function Layout() {
@@ -53,6 +54,9 @@ export default function Layout() {
 
       {/* Save-failure / storage warnings (renders nothing when all is well) */}
       <div className="print:hidden"><SyncBanner /></div>
+
+      {/* v1.5: microphone for speaking instead of typing (appears when a text box is selected) */}
+      <DictationButton />
 
       {/* Fires study reminders while the app is open (renders a banner when due) */}
       <div className="print:hidden"><ReminderScheduler /></div>

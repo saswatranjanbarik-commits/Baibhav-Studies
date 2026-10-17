@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { CheckSquare, Plus, Search, Filter, CheckCircle2, Circle, Calendar, Trash2, X, AlertCircle, Tag, Clock, Link as LinkIcon, FileText, Upload } from 'lucide-react';
 import { todayStr, parseDateStr } from '../lib/dates';
+import { Camera, MessageSquareText } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
+import ScanCapture from '../components/scan/ScanCapture';
+import ScanGallery from '../components/scan/ScanGallery';
+import { deleteScanPages } from '../lib/scans';
 
 interface Task {
   id: string;
@@ -20,9 +25,28 @@ interface Task {
   referenceFileName?: string;
   submissionLink?: string;
   submissionFileName?: string;
+  // ---- v1.5 (optional, additive) ----
+  /** Scanned/uploaded pages of the submitted work (see lib/scans.ts). */
+  scanIds?: string[];
+  submittedBy?: string;
+  submittedAt?: string;
+  /** Tutor feedback on the submission. */
+  reviewNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
+/** A link was saved (old "Upload File" stored only "#" + a file name — no file). */
+const hasRealLink = (t: Task) => !!t.submissionLink && t.submissionLink !== '#';
+const hasSubmission = (t: Task) => (t.scanIds?.length || 0) > 0 || hasRealLink(t);
+
 export default function Tasks() {
+  const { currentUser } = useAuth();
+  const isStudent = currentUser?.role === 'Student';
+  /** v1.5: task whose work is being scanned (camera / photos / PDF). */
+  const [scanTask, setScanTask] = useState<Task | null>(null);
+  /** v1.5: tutor feedback being typed, per task. */
+  const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [tasks, setTasks] = useState<Task[]>([]);
   const [syllabus, setSyllabus] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -154,9 +178,34 @@ export default function Tasks() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this task?')) {
+    const task = tasks.find(t => t.id === id);
+    const pages = task?.scanIds?.length || 0;
+    if (confirm(pages ? `Delete this task and its ${pages} submitted page(s)?` : 'Are you sure you want to delete this task?')) {
       saveTasks(tasks.filter(t => t.id !== id));
+      if (pages) deleteScanPages(task!.scanIds);
     }
+  };
+
+  /** v1.5: scanned pages saved → attach them to the task (added to any earlier pages). */
+  const attachScans = (task: Task, scanIds: string[]) => {
+    const latest = tasks.find(t => t.id === task.id) || task;
+    saveTasks(tasks.map(t => t.id === task.id ? {
+      ...latest,
+      scanIds: [...(latest.scanIds || []), ...scanIds],
+      submittedBy: currentUser?.username || currentUser?.email || '',
+      submittedAt: new Date().toISOString(),
+      status: 'Completed',
+    } : t));
+    setScanTask(null);
+  };
+
+  /** v1.5: tutor feedback / reviewed. */
+  const saveReview = (task: Task) => {
+    const note = (feedback[task.id] ?? task.reviewNote ?? '').trim();
+    saveTasks(tasks.map(t => t.id === task.id ? {
+      ...t, reviewNote: note, reviewedBy: currentUser?.username || currentUser?.email || '', reviewedAt: new Date().toISOString(),
+    } : t));
+    setFeedback(f => { const c = { ...f }; delete c[task.id]; return c; });
   };
 
   const filteredTasks = tasks.filter(t => {
@@ -365,27 +414,87 @@ export default function Tasks() {
                             </div>
                           )}
                           
-                          <div className="pl-8 mb-4">
-                            {(task.submissionLink || task.submissionFileName) ? (
+                          <div className="pl-8 mb-4 space-y-2">
+                            {/* v1.5: scanned / uploaded pages */}
+                            {(task.scanIds?.length || 0) > 0 && (
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Submitted Work</span>
-                                <a href={task.submissionLink || '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-md border border-emerald-200 w-fit transition-colors">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                  Submitted work · {task.scanIds!.length} page{task.scanIds!.length === 1 ? '' : 's'}
+                                </span>
+                                <ScanGallery scanIds={task.scanIds!} downloadName={task.title} />
+                                {task.submittedAt && (
+                                  <span className="text-[11px] text-slate-400">
+                                    by {task.submittedBy || 'student'} · {new Date(task.submittedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {hasRealLink(task) && (
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Submitted link</span>
+                                <a href={task.submissionLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-md border border-emerald-200 w-fit transition-colors">
                                   <CheckCircle2 className="h-3.5 w-3.5" />
                                   {task.submissionFileName || 'View Submission'}
                                 </a>
                               </div>
-                            ) : (
-                              task.status !== 'Completed' && (
-                                <button 
+                            )}
+                            {!hasRealLink(task) && task.submissionFileName && !(task.scanIds?.length) && (
+                              <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                "{task.submissionFileName}" was chosen earlier, but older versions of the app didn't save the file itself. Please submit it again with Scan.
+                              </div>
+                            )}
+                            {!hasSubmission(task) ? (
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  onClick={() => setScanTask(task)}
+                                  className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 rounded-md transition-colors"
+                                >
+                                  <Camera className="h-3.5 w-3.5" /> Scan &amp; submit
+                                </button>
+                                <button
                                   onClick={() => setSubmitModalTask(task)}
                                   className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1.5 rounded-md border border-transparent hover:border-indigo-200 transition-colors"
                                 >
-                                  <Upload className="h-3.5 w-3.5" /> Submit Work
+                                  <Upload className="h-3.5 w-3.5" /> Submit a link
+                                </button>
+                              </div>
+                            ) : (
+                              !task.reviewedAt && (
+                                <button
+                                  onClick={() => setScanTask(task)}
+                                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-md"
+                                >
+                                  <Camera className="h-3.5 w-3.5" /> Add more pages
                                 </button>
                               )
                             )}
+
+                            {/* v1.5: tutor feedback */}
+                            {task.reviewedAt && (
+                              <div className="text-xs bg-emerald-50 border border-emerald-200 rounded-md p-2 text-emerald-900">
+                                <div className="font-semibold flex items-center gap-1"><MessageSquareText className="h-3.5 w-3.5" /> Reviewed by {task.reviewedBy}</div>
+                                {task.reviewNote && <div className="mt-0.5 whitespace-pre-wrap">{task.reviewNote}</div>}
+                              </div>
+                            )}
+                            {!isStudent && hasSubmission(task) && (
+                              <div className="space-y-1.5">
+                                <textarea
+                                  value={feedback[task.id] ?? task.reviewNote ?? ''}
+                                  onChange={e => setFeedback(f => ({ ...f, [task.id]: e.target.value }))}
+                                  rows={2}
+                                  placeholder="Feedback for the student (optional)…"
+                                  className="w-full text-xs border border-slate-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                />
+                                <button
+                                  onClick={() => saveReview(task)}
+                                  className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2.5 py-1 rounded-md"
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> {task.reviewedAt ? 'Update feedback' : 'Mark reviewed'}
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          
+
                           <div className="pl-8 flex items-center gap-2 mt-auto">
                             <div className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md border ${
                               isOverdue(task.dueDate, task.status) 
@@ -620,7 +729,7 @@ export default function Tasks() {
             
             <form onSubmit={handleSubmitWork} className="p-6 overflow-y-auto flex-1 space-y-4">
               <p className="text-sm text-slate-600 mb-4">
-                Submit your work for <strong>{submitModalTask.title}</strong> by providing a cloud link or uploading a file.
+                Submit your work for <strong>{submitModalTask.title}</strong> by pasting a cloud link, or scan the pages.
               </p>
 
               <div>
@@ -647,36 +756,16 @@ export default function Tasks() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Upload File (PDF / Image)</label>
-                <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 transition-colors relative">
-                  <input
-                    type="file"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                    disabled={!!submissionLinkInput}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setSubmissionFileInput(e.target.files[0]);
-                      }
-                    }}
-                  />
-                  {submissionFileInput ? (
-                    <div className="flex flex-col items-center">
-                      <div className="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-2">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <p className="text-sm font-semibold text-slate-700">{submissionFileInput.name}</p>
-                      <p className="text-xs text-indigo-600 mt-1">Ready to submit</p>
-                    </div>
-                  ) : (
-                    <div className={`flex flex-col items-center ${submissionLinkInput ? 'opacity-50' : ''}`}>
-                      <Upload className="h-8 w-8 text-slate-400 mb-2" />
-                      <p className="text-sm font-semibold text-slate-700">Click to browse or drag and drop</p>
-                      <p className="text-xs text-slate-500 mt-1">PDF, PNG, JPG up to 10MB</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+              {/* v1.5: real file saving — scan pages or upload photos / a small PDF */}
+              <button
+                type="button"
+                onClick={() => { const t = submitModalTask; setSubmitModalTask(null); setSubmissionLinkInput(''); setScanTask(t); }}
+                className="w-full border-2 border-dashed border-indigo-300 rounded-xl p-5 text-center hover:bg-indigo-50 transition-colors flex flex-col items-center"
+              >
+                <Camera className="h-8 w-8 text-indigo-500 mb-2" />
+                <span className="text-sm font-semibold text-slate-700">Scan pages or upload photos / PDF</span>
+                <span className="text-xs text-slate-500 mt-1">Opens the camera on a tablet or phone</span>
+              </button>
 
               <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
@@ -688,7 +777,7 @@ export default function Tasks() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!submissionLinkInput && !submissionFileInput}
+                  disabled={!submissionLinkInput}
                   className="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 rounded-lg shadow-sm transition-colors flex items-center gap-2"
                 >
                   <CheckCircle2 className="h-4 w-4" /> Submit Task
@@ -697,6 +786,19 @@ export default function Tasks() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* v1.5: scan & submit */}
+      {scanTask && currentUser && (
+        <ScanCapture
+          user={currentUser}
+          title="Scan & submit work"
+          subtitle={scanTask.title}
+          context={{ type: 'task', id: scanTask.id }}
+          sendLabel="Submit"
+          onClose={() => setScanTask(null)}
+          onDone={(ids) => attachScans(scanTask, ids)}
+        />
       )}
     </div>
   );

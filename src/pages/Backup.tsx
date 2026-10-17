@@ -24,7 +24,7 @@ interface BackupFile {
   createdAt: string;
   store: Record<string, any>;
   users: Record<string, any>;
-  /** v1.5 (optional): class boards, whiteboard pages and personal class notes, keyed by document id. */
+  /** v1.5 (optional): class boards, whiteboard pages, personal class notes and scanned pages, keyed by document id. */
   classrooms?: Record<string, any>;
 }
 
@@ -46,11 +46,11 @@ export default function Backup() {
       const storeSnap = await getDocFromServer(doc(db, STORE_COLLECTION, STORE_DOC_ID));
       const usersSnap = await getDocs(collection(db, 'users'));
       // v1.5: class boards (appStore/classroom_*), whiteboard pages (appStore/whiteboard_*)
-      // and personal class notes (appStore/mynotes_*)
+      // personal class notes (appStore/mynotes_*) and scanned work (appStore/scan_*)
       const extraSnap = await getDocs(collection(db, STORE_COLLECTION));
       const classrooms = Object.fromEntries(
         extraSnap.docs
-          .filter((d) => /^(classroom_|whiteboard_|mynotes_)/.test(d.id))
+          .filter((d) => /^(classroom_|whiteboard_|mynotes_|scan_)/.test(d.id))
           .map((d) => [d.id, d.data()]),
       );
 

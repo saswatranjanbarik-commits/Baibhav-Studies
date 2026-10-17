@@ -19,7 +19,9 @@ import type { OnlineClass } from '../../lib/classes';
 import {
   ContentScope, SCOPE_LABELS, availableScopes, defaultScope, scopeFilter, matchesSearch, embeddableUrl,
 } from '../../lib/classroomContent';
-import type { SharedItem, PresentView, PresentState } from '../../lib/classChat';
+import type { SharedItem, PresentView, PresentState, MediaState } from '../../lib/classChat';
+import { youTubeId } from '../../lib/youtube';
+import YouTubePlayer from './YouTubePlayer';
 import FlashcardDeck, { Empty } from './FlashcardDeck';
 import QuizRunner from './QuizRunner';
 import PresentedView from './PresentedView';
@@ -114,13 +116,16 @@ export default function LearningPanel({
   type Shown = { item?: SharedItem; flag: boolean; label: string };
   const [deckView, setDeckView] = useState<Shown>({ flag: false, label: '' });
   const [quizView, setQuizView] = useState<Shown>({ flag: false, label: '' });
+  /** Play/pause/position of a YouTube note (sent to followers while presenting). */
+  const [media, setMedia] = useState<MediaState | undefined>(undefined);
+  useEffect(() => { setMedia(undefined); }, [openNote?.id]);
   const reportRef = useRef(onPresentView);
   reportRef.current = onPresentView;
   const noteItem: SharedItem | undefined = openNote
     ? { type: 'note', itemId: openNote.id, title: openNote.title, link: openNote.link }
     : undefined;
   const shown: PresentView =
-    tab === 'notes' ? { tab, item: noteItem, label: openNote ? '' : 'Notes list' }
+    tab === 'notes' ? { tab, item: noteItem, label: openNote ? '' : 'Notes list', media: openNote ? media : undefined }
     : tab === 'flashcards' ? { tab, item: deckView.item, flipped: deckView.flag, label: deckView.label }
     : { tab, item: quizView.item, revealed: quizView.flag, label: quizView.label };
   const shownKey = JSON.stringify(shown);
@@ -200,7 +205,7 @@ export default function LearningPanel({
 
       <div className="flex-1 min-h-0 overflow-hidden">
         {tab === 'notes' && (openNote
-          ? <NoteViewer note={openNote} onBack={() => setOpenNote(null)} onShare={onShare} />
+          ? <NoteViewer note={openNote} onBack={() => setOpenNote(null)} onShare={onShare} presenting={!!presenting} onMedia={setMedia} />
           : <NotesList notes={visibleNotes} onOpen={setOpenNote} />)}
         {tab === 'flashcards' && (
           <FlashcardDeck
@@ -248,8 +253,12 @@ function NotesList({ notes, onOpen }: { notes: StudyNoteLike[]; onOpen: (n: Stud
   );
 }
 
-function NoteViewer({ note, onBack, onShare }: { note: StudyNoteLike; onBack: () => void; onShare?: (item: SharedItem) => void }) {
+function NoteViewer({ note, onBack, onShare, presenting, onMedia }: {
+  note: StudyNoteLike; onBack: () => void; onShare?: (item: SharedItem) => void;
+  presenting: boolean; onMedia: (m: MediaState) => void;
+}) {
   const embed = embeddableUrl(note.link);
+  const ytId = youTubeId(note.link);
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-slate-200 shrink-0">
@@ -266,7 +275,18 @@ function NoteViewer({ note, onBack, onShare }: { note: StudyNoteLike; onBack: ()
           <ExternalLink className="h-3.5 w-3.5" /> New tab
         </a>
       </div>
-      {embed ? (
+      {presenting && !ytId && embed && (
+        <div className="shrink-0 text-[11px] px-2 py-1 bg-amber-50 text-amber-800 border-b border-amber-200">
+          The class sees this file, but scrolling and page turns inside it can't be copied to their screen.
+          To show them exactly, use <strong>Share screen</strong> at the top (choose this tab).
+        </div>
+      )}
+      {ytId ? (
+        <div className="flex-1 min-h-0">
+          {/* While presenting, play/pause/position are copied to the class; each device plays the sound itself. */}
+          <YouTubePlayer videoId={ytId} title={note.title} onMedia={onMedia} />
+        </div>
+      ) : embed ? (
         <iframe title={note.title} src={embed} className="flex-1 w-full border-0 bg-slate-50" allow="autoplay; fullscreen" />
       ) : (
         <Empty text="This link can't be shown inside the app (the site doesn't allow it). Use “New tab” — the class keeps running here." />
