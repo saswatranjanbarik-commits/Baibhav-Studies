@@ -138,7 +138,10 @@ export interface PresentView {
   flipped?: boolean;        // flashcard showing its answer
   revealed?: boolean;       // quiz answer shown
   label?: string;           // e.g. "Card 3 of 12"
+  /** YouTube note: the tutor's player — followers play/pause/seek to match. */
+  media?: MediaState;
 }
+export interface MediaState { playing: boolean; time: number; at: string }
 export interface PresentState extends PresentView {
   by: string;               // presenter email
   byName: string;
@@ -146,8 +149,23 @@ export interface PresentState extends PresentView {
   at: string;               // ISO — last change
 }
 
+/**
+ * The tutor's window layout (v1.5). Students' class rooms use it — only the
+ * tutor/admin can switch windows on/off or resize them.
+ */
+export interface SharedLayout {
+  show: { video: boolean; whiteboard: boolean; questions: boolean; learning: boolean };
+  mainRatio: number;
+  stageRatio: number;
+  sideRatio: number;
+  stageTab: 'video' | 'whiteboard';
+  sideTab: 'questions' | 'learning';
+  by: string;
+  at: string;
+}
+
 /** Shared class-room state kept on the class board document (v1.5). */
-export interface BoardMeta { wbPage: number; wbPages: number; present: PresentState | null }
+export interface BoardMeta { wbPage: number; wbPages: number; present: PresentState | null; layout: SharedLayout | null }
 
 export function listenToClassBoard(
   classId: string,
@@ -162,7 +180,8 @@ export function listenToClassBoard(
       const wbPages = Math.max(1, Number(data.wbPages) || 1);
       const wbPage = Math.min(wbPages, Math.max(1, Number(data.wbPage) || 1));
       const present = data.present && data.present.by && data.present.tab ? (data.present as PresentState) : null;
-      onData((data.messages as Record<string, ClassMessage>) || {}, { wbPage, wbPages, present });
+      const layout = data.layout && data.layout.show ? (data.layout as SharedLayout) : null;
+      onData((data.messages as Record<string, ClassMessage>) || {}, { wbPage, wbPages, present, layout });
     },
     (err) => {
       console.warn('Class board listener failed:', err);
@@ -193,6 +212,12 @@ export async function setWhiteboardPage(classId: string, page: number, pages?: n
   const data: Record<string, unknown> = { classId, wbPage: page, updatedAt: serverTimestamp() };
   if (pages) data.wbPages = pages;
   await setDoc(ref, data, { merge: true });
+}
+
+/** Publish the tutor's window layout to the class. */
+export async function setSharedLayout(classId: string, layout: SharedLayout) {
+  const ref = doc(db, STORE_COLLECTION, roomDocId(classId));
+  await setDoc(ref, { classId, layout: clean(layout) }, { mergeFields: ['classId', 'layout'] });
 }
 
 /** Start/update (state) or stop (null) presenting the Learning window. */

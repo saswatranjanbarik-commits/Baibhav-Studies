@@ -28,16 +28,18 @@ import CompleteClassModal from '../components/CompleteClassModal';
 import { usePresenceHeartbeat } from '../lib/presence';
 import {
   ClassroomLayout, ClassroomPanel, DEFAULT_LAYOUT, loadLayout, saveLayout, togglePanel, revealPanel, isWideScreen,
+  normaliseLayout,
 } from '../lib/classroomLayout';
 import {
   ClassMessage, SharedItem, BoardMeta, PresentView, listenToClassBoard, postMessage, newMessageId, openQuestionCount, setWhiteboardPage,
-  setPresent,
+  setPresent, setSharedLayout,
 } from '../lib/classChat';
 import ResizeHandle from '../components/classroom/ResizeHandle';
 import QuestionsPanel from '../components/classroom/QuestionsPanel';
 import LearningPanel, { LearningFocus, LearningTab } from '../components/classroom/LearningPanel';
 import Whiteboard from '../components/classroom/Whiteboard';
 import VideoControls from '../components/classroom/VideoControls';
+import DictationButton from '../components/DictationButton';
 
 export default function ClassRoom() {
   const { id } = useParams();
@@ -75,16 +77,24 @@ export default function ClassRoom() {
   }, [cls?.id, cls ? canJoin(cls, now) : false]); // re-try when the join window opens
 
   // ---- v1.5: window layout -------------------------------------------------
-  const [layout, setLayout] = useState<ClassroomLayout>(loadLayout);
+  const [layout, setLayoutState] = useState<ClassroomLayout>(loadLayout);
+  // Only the tutor/admin can open/close or resize windows; students use the
+  // tutor's layout (synced below). Narrow-screen tabs stay free for everyone.
+  const isHostRef = useRef(isHost);
+  isHostRef.current = isHost;
+  const setLayout = useCallback((update: ClassroomLayout | ((l: ClassroomLayout) => ClassroomLayout)) => {
+    if (isHostRef.current) setLayoutState(update);
+  }, []);
   const [wide, setWide] = useState(() => isWideScreen(window.innerWidth, window.innerHeight));
   const mainRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const sideRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isHost) return; // students' layout comes from the tutor
     const t = setTimeout(() => saveLayout(layout), 300); // remember on this device
     return () => clearTimeout(t);
-  }, [layout]);
+  }, [layout, isHost]);
 
   useEffect(() => {
     const onResize = () => setWide(isWideScreen(window.innerWidth, window.innerHeight));
@@ -94,7 +104,7 @@ export default function ClassRoom() {
 
   // ---- v1.5: live class board ------------------------------------------------
   const [messages, setMessages] = useState<Record<string, ClassMessage>>({});
-  const [boardMeta, setBoardMeta] = useState<BoardMeta>({ wbPage: 1, wbPages: 1, present: null });
+  const [boardMeta, setBoardMeta] = useState<BoardMeta>({ wbPage: 1, wbPages: 1, present: null, layout: null });
   const [boardError, setBoardError] = useState<string | null>(null);
   const [focus, setFocus] = useState<LearningFocus | null>(null);
 
@@ -103,6 +113,38 @@ export default function ClassRoom() {
     setBoardError(null);
     return listenToClassBoard(cls.id, (m, meta) => { setMessages(m); setBoardMeta(meta); setBoardError(null); }, setBoardError);
   }, [cls?.id]);
+
+  // ---- v1.5: the tutor's layout is the class layout ------------------------------------
+  const lastSharedLayout = useRef('');
+  const layoutKey = (l: Pick<ClassroomLayout, 'show' | 'mainRatio' | 'stageRatio' | 'sideRatio'>) =>
+    JSON.stringify([l.show.video, l.show.whiteboard, l.show.questions, l.show.learning,
+      l.mainRatio.toFixed(3), l.stageRatio.toFixed(3), l.sideRatio.toFixed(3)]);
+
+  // Apply the shared layout (students always; a second tutor/admin too).
+  useEffect(() => {
+    const shared = boardMeta.layout;
+    if (!shared || (isHost && shared.by === currentUser?.email)) return;
+    const next = normaliseLayout(shared);
+    lastSharedLayout.current = layoutKey(next);
+    setLayoutState((l) => ({ ...next, stageTab: isHost ? next.stageTab : l.stageTab, sideTab: isHost ? next.sideTab : l.sideTab }));
+  }, [boardMeta.layout?.at]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tutor/admin: publish layout changes (dragging sends one update when the drag pauses).
+  useEffect(() => {
+    if (!isHost || !cls || !currentUser) return;
+    const key = layoutKey(layout);
+    if (key === lastSharedLayout.current) return;
+    const t = setTimeout(() => {
+      lastSharedLayout.current = key;
+      setSharedLayout(cls.id, {
+        show: { ...layout.show },
+        mainRatio: layout.mainRatio, stageRatio: layout.stageRatio, sideRatio: layout.sideRatio,
+        stageTab: layout.stageTab, sideTab: layout.sideTab,
+        by: currentUser.email, at: new Date().toISOString(),
+      }).catch((e) => console.warn('Could not share the layout', e));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [layout, isHost, cls?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- v1.5: presenting the Learning window --------------------------------------
   const present = boardMeta.present;
@@ -258,7 +300,10 @@ export default function ClassRoom() {
           <span className="hidden md:inline text-xs text-indigo-100 whitespace-nowrap">{minsLeft} min left</span>
         )}
         <VideoControls frame={frame} onShowVideo={() => setLayout((l) => revealPanel(l, 'video'))} />
-        {hasClass && (
+        {hasClass && !isHost && (
+          <span className="hidden sm:inline text-[11px] text-indigo-200 whitespace-nowrap" title="Your tutor arranges the windows">Layout by tutor</span>
+        )}
+        {hasClass && isHost && (
           <div className="flex items-center gap-1" role="group" aria-label="Show or hide windows">
             <PanelToggle panel="video" label="Video" on={layout.show.video} onToggle={toggle} Icon={Video} />
             <PanelToggle panel="whiteboard" label="Whiteboard" on={layout.show.whiteboard} onToggle={toggle} Icon={PenTool} />
@@ -288,7 +333,7 @@ export default function ClassRoom() {
             <PairTabs
               tabs={[{ id: 'video', label: 'Video' }, { id: 'whiteboard', label: 'Whiteboard' }]}
               active={layout.stageTab}
-              onSelect={(t) => setLayout((l) => ({ ...l, stageTab: t as 'video' | 'whiteboard' }))}
+              onSelect={(t) => setLayoutState((l) => ({ ...l, stageTab: t as 'video' | 'whiteboard' }))}
             />
           )}
           <div style={videoStyle} className="min-h-0 relative">
@@ -296,6 +341,7 @@ export default function ClassRoom() {
           </div>
           {bothStage && !stageTabbed && (
             <ResizeHandle
+              disabled={!isHost}
               direction="column"
               containerRef={stageRef}
               ratio={layout.stageRatio}
@@ -325,6 +371,7 @@ export default function ClassRoom() {
 
         {stageShown && sideShown && (
           <ResizeHandle
+            disabled={!isHost}
             direction={wide ? 'row' : 'column'}
             containerRef={mainRef}
             ratio={layout.mainRatio}
@@ -341,7 +388,7 @@ export default function ClassRoom() {
               <PairTabs
                 tabs={[{ id: 'learning', label: 'Learning' }, { id: 'questions', label: `Questions${openQs ? ` (${openQs})` : ''}` }]}
                 active={layout.sideTab}
-                onSelect={(t) => setLayout((l) => ({ ...l, sideTab: t as 'learning' | 'questions' }))}
+                onSelect={(t) => setLayoutState((l) => ({ ...l, sideTab: t as 'learning' | 'questions' }))}
               />
             )}
             <div style={learningStyle} className="min-h-0 relative">
@@ -362,6 +409,7 @@ export default function ClassRoom() {
             </div>
             {bothSide && !sideTabbed && (
               <ResizeHandle
+                disabled={!isHost}
                 direction="column"
                 containerRef={sideRef}
                 ratio={layout.sideRatio}
@@ -386,6 +434,9 @@ export default function ClassRoom() {
           </div>
         )}
       </div>
+
+      {/* v1.5: dictation for the class board, My notes and whiteboard text */}
+      <DictationButton />
 
       {showComplete && cls && (
         <CompleteClassModal

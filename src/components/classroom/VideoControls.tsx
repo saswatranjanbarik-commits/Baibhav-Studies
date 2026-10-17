@@ -6,6 +6,9 @@
  * window is made small they get tucked away in its "…" menu; these are
  * always visible.
  *
+ * Screen sharing asks for sound too: in Chrome/Edge pick a browser TAB and
+ * tick "Also share tab audio" to share a video's sound.
+ *
  * Screen sharing needs a desktop browser (Chrome, Edge, Firefox, Safari on a
  * laptop/computer). Android and iPhone/iPad browsers can't share the screen —
  * the button then explains that instead.
@@ -68,7 +71,17 @@ export default function VideoControls({ frame, onShowVideo }: Props) {
     }
     try {
       if (sharing) frame.stopScreenShare();
-      else frame.startScreenShare();
+      // Ask for sound too: in Chrome/Edge choose a TAB and tick "Also share tab audio"
+      // so a video playing in that tab is heard by everyone.
+      else frame.startScreenShare({
+        displayMediaOptions: {
+          video: true,
+          audio: true,
+          selfBrowserSurface: 'include',
+          surfaceSwitching: 'include',
+          systemAudio: 'include',
+        },
+      });
     } catch (e) {
       console.warn(e);
       setNote('Could not start screen sharing.');
