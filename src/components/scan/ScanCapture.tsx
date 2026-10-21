@@ -10,22 +10,30 @@
  *  3. Size: Small (saves space) / Standard / Sharp.
  *  4. "Submit"/"Send" saves the pages (lib/scans.ts) and returns their ids.
  *     They can be downloaded later as ONE PDF.
+ *  5. Also: PDF files, and audio — record a voice answer (or pick an audio
+ *     file). `startWith` opens the chosen option straight away.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Camera, ImagePlus, RotateCcw, RotateCw, Trash2, ChevronUp, ChevronDown, X, Loader2, FileText, Wand2, Crop, Maximize,
+  Mic, Music,
 } from 'lucide-react';
+import AudioRecorder, { canRecordAudio, fmtDuration } from './AudioRecorder';
 import type { AppUser } from '../../lib/AuthContext';
 import {
   ScanMode, ScanSize, NormQuad, MAX_PAGES, loadImageFile, renderPage, readPdf, saveScanPage, newScanId,
-  autoDetectCorners, rotatedCanvas,
+  autoDetectCorners, rotatedCanvas, readFileData,
 } from '../../lib/scans';
+
+export type CaptureStart = 'camera' | 'gallery' | 'pdf' | 'audio';
 
 interface Draft {
   key: string;
-  kind: 'image' | 'pdf';
+  kind: 'image' | 'pdf' | 'audio';
   img?: HTMLImageElement;
-  pdfData?: string;
+  pdfData?: string;      // PDF or audio file, as a data URL
+  mime?: string;
+  durationSec?: number;
   name?: string;
   rotation: number;
   mode: ScanMode;
@@ -43,6 +51,8 @@ interface Props {
   /** Optional caption box (class answers). */
   withCaption?: boolean;
   sendLabel?: string;
+  /** Open this option straight away (e.g. the "Audio" button on a task). */
+  startWith?: CaptureStart;
   onClose: () => void;
   /** Gets the saved page ids, the note, and the total stored size (bytes). */
   onDone: (scanIds: string[], caption: string, bytes: number) => void | Promise<void>;
@@ -50,7 +60,7 @@ interface Props {
 
 const SIZE_LABELS: Record<ScanSize, string> = { small: 'Small (saves space)', standard: 'Standard', sharp: 'Sharp' };
 
-export default function ScanCapture({ user, title, subtitle, context, withCaption, sendLabel, onClose, onDone }: Props) {
+export default function ScanCapture({ user, title, subtitle, context, withCaption, sendLabel, startWith, onClose, onDone }: Props) {
   const [pages, setPages] = useState<Draft[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +69,15 @@ export default function ScanCapture({ user, title, subtitle, context, withCaptio
   const [cropping, setCropping] = useState<string | null>(null); // key of the page being aligned
   const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const pdfInput = useRef<HTMLInputElement>(null);
+  const [recording, setRecording] = useState(startWith === 'audio');
+
+  // Open the chosen option once (the tap that opened this screen still counts as a user action).
+  useEffect(() => {
+    if (startWith === 'camera') cameraInput.current?.click();
+    else if (startWith === 'gallery') fileInput.current?.click();
+    else if (startWith === 'pdf') pdfInput.current?.click();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Preview at the small size (fast); the chosen size is used when saving.
   const preview = (d: Omit<Draft, 'preview'>): Draft => ({
@@ -77,7 +96,9 @@ export default function ScanCapture({ user, title, subtitle, context, withCaptio
       if (pages.length + added.length >= MAX_PAGES) { setError(`Up to ${MAX_PAGES} pages at a time.`); break; }
       try {
         if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
-          added.push({ key: newScanId(), kind: 'pdf', pdfData: await readPdf(file), name: file.name, rotation: 0, mode: 'photo', corners: null, preview: '' });
+          added.push({ key: newScanId(), kind: 'pdf', pdfData: await readPdf(file), mime: 'application/pdf', name: file.name, rotation: 0, mode: 'photo', corners: null, preview: '' });
+        } else if (file.type.startsWith('audio/')) {
+          added.push({ key: newScanId(), kind: 'audio', pdfData: await readFileData(file, file.name), mime: file.type, name: file.name, rotation: 0, mode: 'photo', corners: null, preview: '' });
         } else {
           const img = await loadImageFile(file);
           const corners = autoDetectCorners(img, 0);
@@ -89,6 +110,21 @@ export default function ScanCapture({ user, title, subtitle, context, withCaptio
     }
     setPages((p) => [...p, ...added]);
     setBusy(null);
+  };
+
+  const addRecording = async (a: { blob: Blob; mime: string; durationSec: number }) => {
+    try {
+      const data = await readFileData(a.blob, 'The recording');
+      const ext = a.mime.includes('mp4') ? 'm4a' : a.mime.includes('ogg') ? 'ogg' : 'webm';
+      setPages((p) => [...p, {
+        key: newScanId(), kind: 'audio', pdfData: data, mime: a.mime, durationSec: a.durationSec,
+        name: `recording-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.${ext}`,
+        rotation: 0, mode: 'photo', corners: null, preview: '',
+      }]);
+      setRecording(false);
+    } catch (e: any) {
+      setError(e?.message || 'The recording could not be added.');
+    }
   };
 
   const update = (key: string, change: Partial<Draft>) =>
@@ -114,13 +150,13 @@ export default function ScanCapture({ user, title, subtitle, context, withCaptio
     let bytes = 0;
     try {
       for (let i = 0; i < pages.length; i++) {
-        setBusy(`Saving page ${i + 1} of ${pages.length}…`);
+        setBusy(`Saving ${i + 1} of ${pages.length}…`);
         const d = pages[i];
         const id = newScanId();
         const at = new Date().toISOString();
         const by = { by: user.email, byName: user.username || user.email, at, context };
-        if (d.kind === 'pdf') {
-          await saveScanPage({ id, kind: 'pdf', mime: 'application/pdf', data: d.pdfData!, bytes: d.pdfData!.length, name: d.name, ...by });
+        if (d.kind === 'pdf' || d.kind === 'audio') {
+          await saveScanPage({ id, kind: d.kind, mime: d.mime || (d.kind === 'pdf' ? 'application/pdf' : 'audio/webm'), data: d.pdfData!, bytes: d.pdfData!.length, name: d.name, durationSec: d.durationSec, ...by });
           bytes += d.pdfData!.length;
         } else {
           const r = renderPage(d.img!, { rotation: d.rotation, mode: d.mode, corners: d.corners, size });
@@ -164,9 +200,17 @@ export default function ScanCapture({ user, title, subtitle, context, withCaptio
             <button onClick={() => cameraInput.current?.click()} disabled={!!busy} className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg px-4 py-2.5 disabled:opacity-50">
               <Camera className="h-5 w-5" /> {pages.length ? 'Take next page' : 'Take photo'}
             </button>
-            <button onClick={() => fileInput.current?.click()} disabled={!!busy} className="inline-flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg px-4 py-2.5 disabled:opacity-50">
-              <ImagePlus className="h-5 w-5" /> Add from gallery / files
+            <button onClick={() => fileInput.current?.click()} disabled={!!busy} className="inline-flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg px-3 py-2.5 disabled:opacity-50">
+              <ImagePlus className="h-5 w-5" /> Gallery
             </button>
+            <button onClick={() => pdfInput.current?.click()} disabled={!!busy} className="inline-flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg px-3 py-2.5 disabled:opacity-50">
+              <FileText className="h-5 w-5" /> PDF
+            </button>
+            {canRecordAudio() && (
+              <button onClick={() => setRecording(true)} disabled={!!busy || recording} className="inline-flex items-center gap-2 border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg px-3 py-2.5 disabled:opacity-50">
+                <Mic className="h-5 w-5" /> Record audio
+              </button>
+            )}
             <label className="ml-auto text-xs text-slate-600 flex items-center gap-1.5">
               Size
               <select value={size} onChange={(e) => setSize(e.target.value as ScanSize)} className="border border-slate-300 rounded-md px-2 py-1 text-xs bg-white">
@@ -175,10 +219,13 @@ export default function ScanCapture({ user, title, subtitle, context, withCaptio
             </label>
             {/* capture="environment" opens the back camera on tablets/phones */}
             <input ref={cameraInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
-            <input ref={fileInput} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+            <input ref={fileInput} type="file" accept="image/*,audio/*" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+            <input ref={pdfInput} type="file" accept="application/pdf,.pdf" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
           </div>
 
-          {!pages.length && (
+          {recording && <AudioRecorder onAdd={addRecording} onCancel={() => setRecording(false)} />}
+
+          {!pages.length && !recording && (
             <div className="text-sm text-slate-500 bg-slate-50 border border-dashed border-slate-300 rounded-xl p-4">
               <strong>Tips:</strong> lay the page flat on a darker table in good light and hold the tablet straight above it. The app finds the page edges and straightens it — you can adjust the corners. Take one photo per page.
             </div>
@@ -190,7 +237,7 @@ export default function ScanCapture({ user, title, subtitle, context, withCaptio
             {pages.map((d, i) => (
               <div key={d.key} className="border border-slate-200 rounded-xl overflow-hidden">
                 <div className="flex flex-wrap items-center gap-1 px-2 py-1.5 bg-slate-50 border-b border-slate-200 text-xs">
-                  <span className="font-bold text-slate-700 mr-auto">Page {i + 1}</span>
+                  <span className="font-bold text-slate-700 mr-auto">{d.kind === 'audio' ? 'Audio' : d.kind === 'pdf' ? 'PDF' : 'Page'} {i + 1}</span>
                   {d.kind === 'image' && (
                     <>
                       <button onClick={() => setCropping(d.key)} className="inline-flex items-center gap-1 rounded px-1.5 py-1 font-semibold text-indigo-700 hover:bg-indigo-50" title="Drag the corners onto the page corners">
@@ -218,6 +265,11 @@ export default function ScanCapture({ user, title, subtitle, context, withCaptio
                       {d.corners ? (d.autoAligned ? 'Page edges found and straightened automatically.' : 'Straightened to your corners.') : 'Whole photo (not straightened).'}
                     </div>
                   </>
+                ) : d.kind === 'audio' ? (
+                  <div className="p-3 bg-slate-100 space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-700"><Music className="h-4 w-4 text-indigo-600" /> {d.durationSec ? `Recording · ${fmtDuration(d.durationSec)}` : d.name}</div>
+                    <audio controls src={d.pdfData} className="w-full" />
+                  </div>
                 ) : (
                   <div className="h-32 flex flex-col items-center justify-center text-slate-600 bg-slate-100">
                     <FileText className="h-8 w-8 text-red-500 mb-1" />
@@ -241,7 +293,7 @@ export default function ScanCapture({ user, title, subtitle, context, withCaptio
         </div>
 
         <div className="px-4 py-3 border-t border-slate-100 flex items-center gap-3">
-          <span className="text-xs text-slate-500 mr-auto">{busy || `${pages.length} page${pages.length === 1 ? '' : 's'}`}</span>
+          <span className="text-xs text-slate-500 mr-auto">{busy || `${pages.length} item${pages.length === 1 ? '' : 's'}`}</span>
           <button onClick={onClose} disabled={!!busy} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-40">Cancel</button>
           <button onClick={send} disabled={!pages.length || !!busy} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:bg-slate-300">
             {busy && <Loader2 className="h-4 w-4 animate-spin" />} {sendLabel || 'Send'}

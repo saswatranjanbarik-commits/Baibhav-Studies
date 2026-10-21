@@ -27,7 +27,7 @@ const navigation = [
   { name: 'Online Classes', href: '/classes', icon: MonitorPlay, color: 'text-indigo-600', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Weekly Report', href: '/report', icon: TrendingUp, color: 'text-emerald-600', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Appreciation', href: '/appreciation', icon: Star, color: 'text-yellow-500', roles: ['Admin', 'Teacher', 'Student'] },
-  { name: 'Daily Log', href: '/daily-log', icon: ClipboardList, color: 'text-indigo-500', roles: ['Admin', 'Teacher', 'Student'] },
+  { name: 'Daily Plan & Log', href: '/daily-log', icon: ClipboardList, color: 'text-indigo-500', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Study Plan', href: '/plan', icon: PenTool, color: 'text-gray-600', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Syllabus', href: '/syllabus', icon: Book, color: 'text-green-600', roles: ['Admin', 'Teacher', 'Student'] },
   { name: 'Study Notes', href: '/notes', icon: Paperclip, color: 'text-gray-400', roles: ['Admin', 'Teacher', 'Student'] },
