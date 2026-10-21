@@ -27,6 +27,7 @@ export const STORE_KEYS = {
   revisionsArchive: 'dugu_revisions_archive', // v1.3: revisions put aside by a fresh start
   topicStatus: 'dugu_topic_status', // v1.3: topics marked completed directly by a tutor/admin
   classes: 'dugu_classes', // v1.4: online classes (schedule, status, outcome)
+  doubts: 'dugu_doubts', // v1.5: student's doubts per subject (answered/resolved by the tutor)
 } as const;
 
 /** Every key that StoreSync mirrors starts with this prefix. */

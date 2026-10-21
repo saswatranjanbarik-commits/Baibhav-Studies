@@ -78,7 +78,7 @@ export default function ReminderScheduler() {
             const mins = start - nowMin;
             const title = mins > 0 ? `Starting in ${mins} min` : 'Starting now';
             showStudyNotification(`⏰ ${title}`, describeEntry(e), key);
-            setBanner({ id: key, title: `${title}: ${[e.subjectName, e.topicName].filter(Boolean).join(' – ')}`, lines: [] });
+            setBanner({ id: key, title: `${title}: ${describeEntry(e).replace(/^\d\d:\d\d /, '')}`, lines: [] });
             fired.add(key);
             changed = true;
           }

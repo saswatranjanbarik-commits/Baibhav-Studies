@@ -37,6 +37,9 @@ As a Teacher, your primary role is to manage the study plan, evaluate students, 
   - Use the **Daily Log** to record what was taught in class. Your logs will automatically reflect in the Calendar and update the Subject Progress.
 - **Study Materials & Flashcards:**
   - Go to **Flashcards** to create flashcards and quizzes for chapters or topics.
+  - **Doubts:** open doubts appear at the top of the **Dashboard**. Press **Answer doubts**, write an answer and press **Mark resolved**.
+  - **Files for a task:** use **Attach files** when creating a task, or **Attach files for the student** on any task — record audio instructions, add a PDF, photos or scans.
+  - **Next Event (Dashboard):** press ✎ to change it. When it has passed, the next Calendar event is shown automatically.
   - **Homework submissions:** on **Tasks**, tap a submitted page to view it full screen (zoom, rotate, download) or press **Download PDF** for all pages in one file. Write feedback and press **Mark reviewed**.
   - **Saving space:** press **Submissions: … MB** at the top of Tasks. Use **Download & free space** (keeps a PDF on your computer, removes the pages from EduTrack, the task stays completed), or delete old completed tasks.
   - **Scanned answers in class** appear on the class board — tap to enlarge.
@@ -87,7 +90,10 @@ As a Student, you can track your study progress, complete tasks, and review mate
 - **Learning Materials:**
   - Click on the **Syllabus** to see what you need to study. Expand chapters/topics to view activity logs and click the link to access Flashcards & Quizzes for that section.
   - Use **Flashcards** and **Study Notes** to revise for your exams.
-- **Submitting homework:** on **Tasks**, press **Scan & submit**, take a photo of each page (lay it flat on a darker table, good light). The app finds the page edges and straightens it — use **Adjust corners** if it missed a corner. Press **Submit** and wait for **✓ Submitted and saved**. Use **Add more pages** if you forgot one. Your tutor's feedback appears under the task.
+- **Daily Plan & Log:** in the morning press **Plan a session** for each thing you will do — choose the type (Self study, Tutor class, School, Play, Activity), then the subject (or the play/activity) and the time. When you finish one, press **✓ Done** (or **Log details…** to add notes) — it goes into your Daily Log automatically.
+- **Doubts:** on **Daily Plan & Log**, press **Ask a doubt**, choose the subject and write (or 🎤 speak) your doubt. Your tutor sees it on the Dashboard and writes the answer under it. If you log a session as **Have Doubt**, you can write the doubt right there.
+- **Submitting homework:** under each task choose **Scan**, **Photos**, **PDF**, **Audio** (record your answer) or **Link**. Files from your tutor (for example audio instructions) appear under the task as **From the tutor**.
+- **Scanning tips:** on **Tasks**, press **Scan & submit**, take a photo of each page (lay it flat on a darker table, good light). The app finds the page edges and straightens it — use **Adjust corners** if it missed a corner. Press **Submit** and wait for **✓ Submitted and saved**. Use **Add more pages** if you forgot one. Your tutor's feedback appears under the task.
 - **In class:** to show your written answer, press the 📷 button next to Send on the class board, take the photo and press **Send to class** — your tutor sees it straight away. Press **Reply** on the tutor's question first to attach it as your answer.
 - **Dictation (speak instead of typing):** tap into a text box, press the round 🎤 button on the right and speak. Say "full stop", "comma", "question mark" or "new line" for punctuation. Press it again to stop. (Your tablet keyboard's own 🎤 also works.)
 - **Online classes:**

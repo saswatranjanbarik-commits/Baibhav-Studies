@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CheckSquare, Plus, Search, Filter, CheckCircle2, Circle, Calendar, Trash2, X, AlertCircle, Tag, Clock, Link as LinkIcon, FileText, Upload } from 'lucide-react';
 import { todayStr, parseDateStr } from '../lib/dates';
-import { Camera, MessageSquareText, HardDrive, Download, Eraser, Loader2 } from 'lucide-react';
+import { Camera, MessageSquareText, HardDrive, Download, Eraser, Loader2, ImagePlus, Mic, Paperclip } from 'lucide-react';
+import type { CaptureStart } from '../components/scan/ScanCapture';
 import { useAuth } from '../lib/AuthContext';
 import ScanCapture from '../components/scan/ScanCapture';
 import ScanGallery from '../components/scan/ScanGallery';
 import { deleteScanPages, downloadPagesAsPdf } from '../lib/scans';
 import {
   Submission, listenToSubmissions, addPages, saveSubmission, confirmSubmission, removeSubmissionFiles,
-  deleteSubmission, formatBytes,
+  deleteSubmission, formatBytes, TaskFiles, addTaskFiles, deleteTaskFiles,
 } from '../lib/submissions';
 
 interface Task {
@@ -69,11 +70,20 @@ export default function Tasks() {
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   /** v1.5: submissions, live from the cloud. */
   const [subs, setSubs] = useState<Record<string, Submission>>({});
+  /** v1.5: files the tutor attached to tasks (audio, PDF, photos, scans). */
+  const [taskFiles, setTaskFiles] = useState<Record<string, TaskFiles>>({});
+  /** Which capture to open: for the student's work, or the tutor's files; and which option first. */
+  const [scanFor, setScanFor] = useState<'work' | 'files'>('work');
+  const [scanStart, setScanStart] = useState<CaptureStart | undefined>(undefined);
+  /** Add-task form: files attached before the task is saved (id reserved up front). */
+  const [draftTaskId, setDraftTaskId] = useState('');
+  const [draftFiles, setDraftFiles] = useState<{ ids: string[]; bytes: number }>({ ids: [], bytes: 0 });
+  const [draftScan, setDraftScan] = useState(false);
   const [subsError, setSubsError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showCleanup, setShowCleanup] = useState(false);
   const [working, setWorking] = useState<string | null>(null); // task id being processed
-  useEffect(() => listenToSubmissions((s) => { setSubs(s); setSubsError(null); }, setSubsError), []);
+  useEffect(() => listenToSubmissions((s, f) => { setSubs(s); setTaskFiles(f); setSubsError(null); }, setSubsError), []);
 
   useEffect(() => {
     if (!notice) return;
@@ -130,7 +140,7 @@ export default function Tasks() {
     if (!newTask.title) return;
 
     const task: Task = {
-      id: Date.now().toString(),
+      id: draftTaskId || Date.now().toString(),
       title: newTask.title,
       description: newTask.description || '',
       dueDate: newTask.dueDate || todayStr(),
@@ -155,6 +165,13 @@ export default function Tasks() {
     }
 
     saveTasks([task, ...tasks]);
+    // v1.5: files attached in the form belong to this task now
+    if (draftFiles.ids.length) {
+      addTaskFiles(undefined, task.id, draftFiles.ids, draftFiles.bytes, currentUser?.username || currentUser?.email || '')
+        .catch((err) => { console.warn(err); setNotice('The task was saved, but its attached files could not be linked. Check the connection.'); });
+    }
+    setDraftFiles({ ids: [], bytes: 0 });
+    setDraftTaskId('');
     setShowAddModal(false);
     setNewTask({
       priority: 'Medium',
@@ -221,8 +238,31 @@ export default function Tasks() {
     if (stale.length) saveTasks(tasks.map(t => (subs[t.id] && t.status !== 'Completed' ? { ...t, status: 'Completed' } : t)));
   }, [tasks, subs, isStudent]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** Close the add-task form; files attached to a task that was never saved are removed. */
+  const cancelAddTask = () => {
+    if (draftFiles.ids.length) deleteScanPages(draftFiles.ids);
+    setDraftFiles({ ids: [], bytes: 0 });
+    setDraftTaskId('');
+    setShowAddModal(false);
+  };
+
+  /** Open the capture screen for a task: the student's work, or the tutor's files. */
+  const openCapture = (task: Task, target: 'work' | 'files', start?: CaptureStart) => {
+    setScanFor(target);
+    setScanStart(start);
+    setScanTask(task);
+  };
+
+  /** v1.5: the tutor added files (instructions) to a task. */
+  const attachTaskFiles = async (task: Task, ids: string[], bytes: number) => {
+    await addTaskFiles(taskFiles[task.id], task.id, ids, bytes, myName);
+    setScanTask(null);
+    setNotice(`✓ ${ids.length} file(s) added to "${task.title}".`);
+  };
+
   const handleDelete = (id: string) => {
     const task = tasks.find(t => t.id === id);
+    if (taskFiles[id]) deleteTaskFiles(taskFiles[id]).catch((e) => console.warn(e));
     const sub = task ? submissionOf(task, subs) : undefined;
     const pages = sub?.scanIds.length || 0;
     if (confirm(pages ? `Delete this task and its ${pages} submitted page(s)?` : 'Are you sure you want to delete this task?')) {
@@ -312,7 +352,8 @@ export default function Tasks() {
     .map(t => ({ task: t, sub: submissionOf(t, subs) }))
     .filter((x): x is { task: Task; sub: Submission } => !!x.sub && x.sub.scanIds.length > 0)
     .sort((a, b) => (a.sub.submittedAt || '').localeCompare(b.sub.submittedAt || ''));
-  const storedBytes = storedSubs.reduce((n, x) => n + (x.sub.bytes || 0), 0);
+  const storedBytes = storedSubs.reduce((n, x) => n + (x.sub.bytes || 0), 0)
+    + Object.values(taskFiles).reduce((n, f) => n + (f.bytes || 0), 0);
 
   const filteredTasks = viewTasks.filter(t => {
     const matchesSearch = (t.title && t.title.toLowerCase().includes(searchQuery.toLowerCase())) || 
@@ -376,7 +417,7 @@ export default function Tasks() {
           </button>
         )}
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { setDraftTaskId(Date.now().toString()); setDraftFiles({ ids: [], bytes: 0 }); setShowAddModal(true); }}
           className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2"
         >
           <Plus className="h-4 w-4" /> Add Task
@@ -532,12 +573,32 @@ export default function Tasks() {
                             </p>
                           )}
             
-                          {(task.referenceLink || task.referenceFileName) && (
-                            <div className="pl-8 mb-4">
-                              <a href={task.referenceLink || '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-md border border-blue-200 transition-colors">
+                          {task.referenceLink && task.referenceLink !== '#' && (
+                            <div className="pl-8 mb-3">
+                              <a href={task.referenceLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-md border border-blue-200 transition-colors">
                                 <FileText className="h-3.5 w-3.5" />
                                 {task.referenceFileName || 'View Reference Material'}
                               </a>
+                            </div>
+                          )}
+                          {task.referenceLink === '#' && task.referenceFileName && (
+                            <div className="pl-8 mb-3 text-[11px] text-amber-700">
+                              "{task.referenceFileName}" was chosen earlier, but the file itself wasn't saved by older versions{!isStudent ? ' — attach it again below' : ''}.
+                            </div>
+                          )}
+
+                          {/* v1.5: files from the tutor (instructions: audio, PDF, photos, scans) */}
+                          {(taskFiles[task.id]?.scanIds.length || 0) > 0 && (
+                            <div className="pl-8 mb-3 space-y-1">
+                              <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">From the tutor</span>
+                              <ScanGallery scanIds={taskFiles[task.id].scanIds} downloadName={`${task.title} - instructions`} compact />
+                            </div>
+                          )}
+                          {!isStudent && (
+                            <div className="pl-8 mb-3">
+                              <button onClick={() => openCapture(task, 'files')} className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 px-2 py-1 rounded-md">
+                                <Paperclip className="h-3.5 w-3.5" /> {taskFiles[task.id] ? 'Add more files for the student' : 'Attach files for the student'}
+                              </button>
                             </div>
                           )}
                           
@@ -548,7 +609,7 @@ export default function Tasks() {
                             busy={working === task.id}
                             feedbackText={feedback[task.id]}
                             onFeedback={(v) => setFeedback(f => ({ ...f, [task.id]: v }))}
-                            onScan={() => setScanTask(task)}
+                            onScan={(start) => openCapture(task, 'work', start)}
                             onLink={() => setSubmitModalTask(task)}
                             onReview={() => saveReview(task)}
                             onPdf={() => downloadPdf(task)}
@@ -591,7 +652,7 @@ export default function Tasks() {
               <h3 className="text-lg font-bold text-slate-900">
                 Add New Task
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={cancelAddTask} className="text-slate-400 hover:text-slate-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -727,37 +788,30 @@ export default function Tasks() {
                       className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
                     />
                   </div>
-                  <div className="relative shrink-0">
-                    <input 
-                      type="file" 
-                      id="upload-ref" 
-                      className="hidden" 
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setNewTask({
-                            ...newTask, 
-                            referenceFileName: e.target.files[0].name,
-                            referenceLink: '#' // Placeholder for real upload logic
-                          });
-                        }
-                      }}
-                    />
-                    <label htmlFor="upload-ref" className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-lg cursor-pointer flex items-center justify-center gap-2 transition-colors border border-slate-200">
-                      <Upload className="h-4 w-4" /> Upload PDF
-                    </label>
-                  </div>
+                  {/* v1.5: real file saving (the old "Upload PDF" kept only the file name) */}
+                  <button
+                    type="button"
+                    onClick={() => setDraftScan(true)}
+                    className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-colors border border-slate-200"
+                  >
+                    <Paperclip className="h-4 w-4" /> Attach files
+                  </button>
                 </div>
-                {newTask.referenceFileName && (
-                  <p className="mt-2 text-xs font-semibold text-indigo-600 flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> {newTask.referenceFileName} attached
-                  </p>
+                <p className="mt-1 text-[11px] text-slate-500">Scan a page, add photos or a PDF, or record audio instructions for the student.</p>
+                {draftFiles.ids.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs font-semibold text-indigo-600 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> {draftFiles.ids.length} file(s) attached
+                    </p>
+                    <ScanGallery scanIds={draftFiles.ids} compact />
+                  </div>
                 )}
               </div>
 
               <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={cancelAddTask}
                   className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                 >
                   Cancel
@@ -865,12 +919,24 @@ export default function Tasks() {
       {scanTask && currentUser && (
         <ScanCapture
           user={currentUser}
-          title="Scan & submit work"
+          title={scanFor === 'files' ? 'Files for the student' : 'Submit your work'}
           subtitle={scanTask.title}
           context={{ type: 'task', id: scanTask.id }}
-          sendLabel="Submit"
+          sendLabel={scanFor === 'files' ? 'Add to task' : 'Submit'}
+          startWith={scanStart}
           onClose={() => setScanTask(null)}
-          onDone={(ids, _caption, bytes) => attachScans(scanTask, ids, bytes)}
+          onDone={(ids, _caption, bytes) => (scanFor === 'files' ? attachTaskFiles(scanTask, ids, bytes) : attachScans(scanTask, ids, bytes))}
+        />
+      )}
+      {draftScan && currentUser && (
+        <ScanCapture
+          user={currentUser}
+          title="Attach files to the new task"
+          subtitle={newTask.title || 'New task'}
+          context={{ type: 'task', id: draftTaskId || 'new' }}
+          sendLabel="Attach"
+          onClose={() => setDraftScan(false)}
+          onDone={(ids, _caption, bytes) => { setDraftFiles((f) => ({ ids: [...f.ids, ...ids], bytes: f.bytes + bytes })); setDraftScan(false); }}
         />
       )}
     </div>
@@ -893,7 +959,7 @@ const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleString([], { date
 
 function SubmissionBlock({ task, sub, isStudent, busy, feedbackText, onFeedback, onScan, onLink, onReview, onPdf, onFree }: {
   task: Task; sub?: Submission; isStudent: boolean; busy: boolean; feedbackText?: string;
-  onFeedback: (v: string) => void; onScan: () => void; onLink: () => void; onReview: () => void;
+  onFeedback: (v: string) => void; onScan: (start?: CaptureStart) => void; onLink: () => void; onReview: () => void;
   onPdf: () => void; onFree: () => void;
 }) {
   const pages = sub?.scanIds.length || 0;
@@ -903,7 +969,7 @@ function SubmissionBlock({ task, sub, isStudent, busy, feedbackText, onFeedback,
       {pages > 0 && (
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Submitted · {pages} page{pages === 1 ? '' : 's'}{sub!.bytes ? ` · ${formatBytes(sub!.bytes)}` : ''}
+            <CheckCircle2 className="h-3.5 w-3.5" /> Submitted · {pages} file{pages === 1 ? '' : 's'}{sub!.bytes ? ` · ${formatBytes(sub!.bytes)}` : ''}
           </span>
           <ScanGallery scanIds={sub!.scanIds} downloadName={task.title} />
           <span className="text-[11px] text-slate-400">by {sub!.submittedBy || 'student'}{sub!.submittedAt ? ` · ${fmtDate(sub!.submittedAt)}` : ''}</span>
@@ -939,18 +1005,20 @@ function SubmissionBlock({ task, sub, isStudent, busy, feedbackText, onFeedback,
         </div>
       )}
       {!submitted ? (
-        <div className="flex flex-wrap gap-2">
-          <button onClick={onScan} className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 rounded-md transition-colors">
-            <Camera className="h-3.5 w-3.5" /> Scan &amp; submit
-          </button>
-          <button onClick={onLink} className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1.5 rounded-md border border-transparent hover:border-indigo-200 transition-colors">
-            <Upload className="h-3.5 w-3.5" /> Submit a link
-          </button>
+        <div className="space-y-1">
+          <span className="text-[11px] font-semibold text-slate-500">Submit your work:</span>
+          <div className="flex flex-wrap gap-1.5">
+            <SubmitBtn onClick={() => onScan('camera')} primary><Camera className="h-3.5 w-3.5" /> Scan</SubmitBtn>
+            <SubmitBtn onClick={() => onScan('gallery')}><ImagePlus className="h-3.5 w-3.5" /> Photos</SubmitBtn>
+            <SubmitBtn onClick={() => onScan('pdf')}><FileText className="h-3.5 w-3.5" /> PDF</SubmitBtn>
+            <SubmitBtn onClick={() => onScan('audio')}><Mic className="h-3.5 w-3.5" /> Audio</SubmitBtn>
+            <SubmitBtn onClick={onLink}><Upload className="h-3.5 w-3.5" /> Link</SubmitBtn>
+          </div>
         </div>
       ) : (
         !sub?.reviewedAt && !sub?.filesRemovedAt && (
-          <button onClick={onScan} className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-md">
-            <Camera className="h-3.5 w-3.5" /> Add more pages
+          <button onClick={() => onScan()} className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-md">
+            <Paperclip className="h-3.5 w-3.5" /> Add more (scan, photos, PDF, audio)
           </button>
         )
       )}
@@ -1054,5 +1122,16 @@ function CleanupModal({ items, oldCompleted, workingId, onClose, onPdf, onDownlo
         </div>
       </div>
     </div>
+  );
+}
+
+function SubmitBtn({ onClick, primary, children }: { onClick: () => void; primary?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-md transition-colors ${primary ? 'text-white bg-indigo-600 hover:bg-indigo-700' : 'text-indigo-700 border border-indigo-200 hover:bg-indigo-50'}`}
+    >
+      {children}
+    </button>
   );
 }

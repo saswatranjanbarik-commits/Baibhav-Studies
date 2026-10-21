@@ -170,7 +170,7 @@ export default function StudyPlan() {
                 entries.map(entry => (
                   <tr key={entry.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-4">
-                      <div className="font-bold text-slate-800 text-sm mb-1">{entry.subjectName} &middot; {entry.chapterName}</div>
+                      <div className="font-bold text-slate-800 text-sm mb-1">{entry.subjectName ? <>{entry.subjectName} &middot; {entry.chapterName}</> : ((entry as any).activityDetail || entry.planType) /* v1.5: Play / Activity plan items */}</div>
                       <div className="text-xs font-medium text-indigo-600 mb-1">{entry.topicName}</div>
                       {entry.subTopicName && (
                         <div className="text-[11px] text-slate-500 flex items-center gap-1">

@@ -72,6 +72,7 @@ export interface PlanEntryLike {
   timeFrom?: string;
   timeTo?: string;
   planType?: string;
+  activityDetail?: string; // v1.5: Play / Activity plan items (no subject)
 }
 
 /** Plan entries scheduled for today that are not completed, earliest first. */
@@ -82,7 +83,7 @@ export function getTodaysPendingPlan(entries: PlanEntryLike[], today = todayStr(
 }
 
 export function describeEntry(e: PlanEntryLike): string {
-  const what = [e.subjectName, e.topicName].filter(Boolean).join(' – ');
+  const what = [e.subjectName, e.topicName].filter(Boolean).join(' – ') || e.activityDetail || '';
   return e.timeFrom ? `${e.timeFrom} ${what}` : what;
 }
 
@@ -216,7 +217,7 @@ export function buildPlanSessionsIcs(entries: PlanEntryLike[], leadMinutes: numb
   const upcoming = entries.filter((e) => e.startDate && e.startDate >= today && e.status !== 'Completed');
   const events: string[] = [];
   for (const e of upcoming) {
-    const title = `${e.planType ? e.planType + ': ' : ''}${[e.subjectName, e.topicName].filter(Boolean).join(' – ')}`;
+    const title = `${e.planType ? e.planType + ': ' : ''}${[e.subjectName, e.topicName].filter(Boolean).join(' – ') || e.activityDetail || ''}`;
     const lines = ['BEGIN:VEVENT', `UID:plan-${e.id}@dugu-edutrack`, `DTSTAMP:${utcStamp()}`];
     if (e.timeFrom) {
       lines.push(`DTSTART:${localStamp(e.startDate!, e.timeFrom)}`);

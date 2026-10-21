@@ -51,7 +51,7 @@ npm run build    # production build into /dist (what Vercel runs)
   `dugu_events`, `dugu_timetable`, `dugu_study_notes`, `dugu_team_notes`,
   `dugu_learning_items`, `dugu_appreciation`, `dugu_upcoming_event`,
   `dugu_reminders` (v1.2), `dugu_revision_settings`, `dugu_revisions_archive`,
-  `dugu_topic_status` (v1.3), `dugu_classes` (v1.4)).
+  `dugu_topic_status` (v1.3), `dugu_classes` (v1.4), `dugu_doubts` (v1.5)).
 * `appStore/classroom_<classId>` (v1.5) → the live class board for one class
   (`messages` map, shared whiteboard page). `appStore/whiteboard_<classId>_<page>`
   (v1.5) → whiteboard strokes. `appStore/mynotes_<user>` (v1.5) → each person's own class

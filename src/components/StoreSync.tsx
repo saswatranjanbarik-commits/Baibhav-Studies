@@ -180,10 +180,13 @@ export default function StoreSync({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem = function (key: string, value: string) {
       originalSetItem.call(this, key, value);
 
+      // Only app data (dugu_*) is synced and announced. (v1.5: before, every
+      // write — including Firestore's own frequent tab bookkeeping — told all
+      // pages to reload, which e.g. wiped what was being typed in edit forms.)
+      if (!key.startsWith(STORE_KEY_PREFIX)) return;
+
       // Let other components on the page update immediately.
       window.dispatchEvent(new Event('cloud_sync_update'));
-
-      if (!key.startsWith(STORE_KEY_PREFIX)) return; // only sync app data
 
       let parsedValue: any = value;
       try { parsedValue = JSON.parse(value); } catch { /* keep raw string */ }

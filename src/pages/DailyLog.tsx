@@ -4,6 +4,11 @@ import { useAuth } from '../lib/AuthContext';
 import { useTeamUsers } from '../lib/useTeamUsers';
 import { scheduleRevisionsForLog } from '../lib/revisionScheduler';
 import { todayStr, toDateStr, parseDateStr, addDays } from '../lib/dates';
+import DayPlanCard, { PlanItem, activityOf, isStudyActivity } from '../components/DayPlanCard';
+import DoubtsCard from '../components/DoubtsCard';
+import { Doubt, addDoubt, newDoubt } from '../lib/doubts';
+import { STORE_KEYS } from '../lib/storeKeys';
+import { useStoredData } from '../lib/useStoredData';
 
 type LogType = 'School' | 'Tutor' | 'Self Study' | 'Play' | 'Activity';
 type Category = 'Rock' | 'Sand' | 'Pebble';
@@ -70,6 +75,16 @@ export default function DailyLog() {
   });
 
   const [activeDate, setActiveDate] = useState<string>(todayStr());
+  // v1.5: doubts (shown in the Doubts section; open ones alert on the Dashboard)
+  const doubts = useStoredData<Doubt[]>(STORE_KEYS.doubts, []);
+  /** Text of the doubt when a log is saved as "Have Doubt". */
+  const [doubtText, setDoubtText] = useState('');
+  // Opened from the Dashboard's "Answer doubts" → scroll to the Doubts section.
+  useEffect(() => {
+    if (window.location.hash !== '#doubts') return;
+    const t = setTimeout(() => document.getElementById('doubts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     const load = () => {
@@ -117,6 +132,78 @@ export default function DailyLog() {
   const activeSubject = syllabus.find(s => s.id === newLog.subjectId);
   const activeChapter = activeSubject?.chapters?.find((c: any) => c.id === newLog.chapterId);
   const activeTopics = activeChapter?.topics?.filter((t: any) => Array.isArray(newLog.topicId) ? newLog.topicId.includes(t.id) : t.id === newLog.topicId) || [];
+
+  // ---- v1.5: daily plan on this page ---------------------------------------
+  /** Save the plan list (same records as the Study Plan page). */
+  const savePlan = (next: PlanItem[]) => {
+    setStudyPlan(next);
+    localStorage.setItem('dugu_study_plan', JSON.stringify(next));
+  };
+
+  /** After logging: mark the plan item done (or in progress) and remember the log. */
+  const markPlanLogged = (planId: string, logId: string, status: 'Completed' | 'In Progress') => {
+    let current: PlanItem[] = studyPlan;
+    try { current = JSON.parse(localStorage.getItem('dugu_study_plan') || '[]'); } catch { /* use state */ }
+    savePlan(current.map((p) => (p.id === planId ? { ...p, status, logId } : p)));
+  };
+
+  /** Daily Log category for a plan item: Play → Sand, Activity → Pebble, study → the subject's (Rock). */
+  const categoryForPlan = (p: PlanItem): Category => {
+    const a = activityOf(p);
+    if (a === 'Play') return 'Sand';
+    if (a === 'Activity') return 'Pebble';
+    return syllabus.find((s) => s.id === p.subjectId)?.category || 'Rock';
+  };
+
+  /** "✓ Done": log the planned session straight away as Completed. */
+  const quickDone = (p: PlanItem) => {
+    const study = isStudyActivity(activityOf(p));
+    const log: DailyLogEntry = {
+      id: Date.now().toString(),
+      date: p.startDate || activeDate,
+      logType: activityOf(p) as LogType,
+      category: categoryForPlan(p),
+      timeFrom: p.timeFrom,
+      timeTo: p.timeTo,
+      notes: 'Logged from the daily plan',
+    };
+    if (study) {
+      Object.assign(log, {
+        subjectId: p.subjectId,
+        subjectName: p.subjectName,
+        chapterId: p.chapterId,
+        chapterName: p.chapterName,
+        topicId: p.topicId || '',
+        topicName: p.topicName || '',
+        subTopicId: p.subTopicId || '',
+        subTopicName: p.subTopicName || '',
+        status: 'Completed',
+      });
+    } else {
+      log.activityDetail = p.activityDetail || activityOf(p);
+    }
+    (Object.keys(log) as (keyof DailyLogEntry)[]).forEach((k) => log[k] === undefined && delete log[k]);
+    saveLogs((prev) => [log, ...prev]);
+    if (log.category === 'Rock') scheduleRevisions(log);
+    markPlanLogged(p.id, log.id, 'Completed');
+  };
+
+  /** "Log details…": open the usual form, pre-filled from the plan item. */
+  const logDetails = (p: PlanItem) => {
+    const study = isStudyActivity(activityOf(p));
+    setSelectedPlanId(p.id);
+    setNewLog({
+      logType: activityOf(p) as LogType,
+      category: categoryForPlan(p),
+      date: p.startDate || activeDate,
+      timeFrom: p.timeFrom,
+      timeTo: p.timeTo,
+      ...(study
+        ? { subjectId: p.subjectId, chapterId: p.chapterId, topicId: p.topicId || '', subTopicId: p.subTopicId || '', status: 'Completed' as const }
+        : { activityDetail: p.activityDetail || '' }),
+    });
+    setShowAdd(true);
+  };
 
   const handlePlanSelect = (planId: string) => {
     setSelectedPlanId(planId);
@@ -215,6 +302,28 @@ export default function DailyLog() {
     if (log.category === 'Rock') {
       scheduleRevisions(log);
     }
+
+    // v1.5: "Have Doubt" → the doubt goes into the Doubts list (tutor sees it on the Dashboard)
+    if (log.category === 'Rock' && log.status === 'Have Doubt' && log.subjectId) {
+      addDoubt(newDoubt({
+        subjectId: log.subjectId, subjectName: log.subjectName || '',
+        chapterId: log.chapterId || undefined, chapterName: log.chapterName || undefined,
+        topicId: typeof log.topicId === 'string' && log.topicId ? log.topicId : undefined,
+        topicName: log.topicName || undefined,
+        text: doubtText.trim() || `Doubt in ${log.topicName || log.chapterName || log.subjectName}`,
+        date: log.date,
+        askedBy: currentUser?.username || currentUser?.email || '',
+        askedByEmail: currentUser?.email || '',
+        logId: log.id,
+      }));
+    }
+    setDoubtText('');
+
+    // v1.5: logged from a plan item → tick it off in the plan
+    if (selectedPlanId) {
+      markPlanLogged(selectedPlanId, log.id, log.status === 'Completed' ? 'Completed' : 'In Progress');
+      setSelectedPlanId('');
+    }
     
     setShowAdd(false);
     setNewLog({ 
@@ -305,12 +414,12 @@ export default function DailyLog() {
       <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
-            <ClipboardList className="h-6 w-6 text-indigo-600" /> Daily Log
+            <ClipboardList className="h-6 w-6 text-indigo-600" /> Daily Plan &amp; Log
           </h2>
-          <p className="text-sm text-slate-500 mt-1">Record and review your daily study sessions and activities.</p>
+          <p className="text-sm text-slate-500 mt-1">Plan your day, tick sessions off as you finish them, and review everything you did.</p>
         </div>
         <button
-          onClick={() => setShowAdd(true)}
+          onClick={() => { setSelectedPlanId(''); setShowAdd(true); }}
           className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 shadow-sm flex items-center gap-2"
         >
           <Plus className="h-4 w-4" /> Add Log
@@ -332,6 +441,19 @@ export default function DailyLog() {
           <div className="text-2xl font-bold text-orange-700">{calculateDuration(filteredLogs.filter(l => l.category === 'Sand'))}</div>
         </div>
       </div>
+
+      {/* v1.5: plan for the selected day (same day as the log list below) */}
+      <DayPlanCard
+        date={activeDate}
+        plan={studyPlan}
+        syllabus={syllabus}
+        onSavePlan={savePlan}
+        onQuickDone={quickDone}
+        onLogDetails={logDetails}
+      />
+
+      {/* v1.5: doubts — written by the student, answered by the tutor */}
+      {currentUser && <DoubtsCard doubts={Array.isArray(doubts) ? doubts : []} syllabus={syllabus} user={currentUser} date={activeDate} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Main Log List */}
@@ -535,7 +657,7 @@ export default function DailyLog() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-lg font-bold text-slate-900">Add Daily Log</h3>
-              <button onClick={() => setShowAdd(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setShowAdd(false); setSelectedPlanId(''); }} className="text-slate-400 hover:text-slate-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -764,6 +886,19 @@ export default function DailyLog() {
                       <option value="Have Doubt">Have Doubt</option>
                     </select>
                   </div>
+                  {newLog.status === 'Have Doubt' && (
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-bold text-amber-800 mb-1.5">What is your doubt?</label>
+                      <textarea
+                        value={doubtText}
+                        onChange={e => setDoubtText(e.target.value)}
+                        rows={3}
+                        maxLength={2000}
+                        placeholder="Write (or 🎤 speak) your doubt — your tutor will see it on the Dashboard."
+                        className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -819,7 +954,7 @@ export default function DailyLog() {
               <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowAdd(false)}
+                  onClick={() => { setShowAdd(false); setSelectedPlanId(''); }}
                   className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg"
                 >
                   Cancel

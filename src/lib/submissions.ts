@@ -4,7 +4,9 @@
  * saved and appears on the tutor's screen live.
  *
  *   Firestore document  appStore/task_submissions
- *     { subs: { <taskId>: Submission } }
+ *     { subs: { <taskId>: Submission },
+ *       refs: { <taskId>: TaskFiles } }   ← v1.5: files the TUTOR adds to a task
+ *                                           (instructions: audio, PDF, photos, scans)
  *
  *   - One small record per task (page ids, who/when, feedback, sizes); the
  *     pages themselves are in appStore/scan_<id> (lib/scans.ts).
@@ -34,6 +36,15 @@ export interface Submission {
   pagesRemoved?: number;
 }
 
+/** Files the tutor attached to a task (instructions / reference). */
+export interface TaskFiles {
+  taskId: string;
+  scanIds: string[];
+  bytes: number;
+  addedBy: string;
+  addedAt: string;
+}
+
 const ref = () => doc(db, STORE_COLLECTION, 'task_submissions');
 
 function clean<T extends object>(o: T): T {
@@ -44,12 +55,12 @@ function clean<T extends object>(o: T): T {
 
 /** Live list of all submissions, by task id. */
 export function listenToSubmissions(
-  onData: (subs: Record<string, Submission>) => void,
+  onData: (subs: Record<string, Submission>, refs: Record<string, TaskFiles>) => void,
   onError: (message: string) => void,
 ): () => void {
   return onSnapshot(
     ref(),
-    (snap) => onData((snap.data()?.subs as Record<string, Submission>) || {}),
+    (snap) => onData((snap.data()?.subs as Record<string, Submission>) || {}, (snap.data()?.refs as Record<string, TaskFiles>) || {}),
     (err) => {
       console.warn('Submissions listener failed:', err);
       onError(err.code === 'permission-denied'
@@ -126,4 +137,25 @@ export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// ---------------------------------------------------------------------------
+// v1.5: tutor's files on a task
+// ---------------------------------------------------------------------------
+
+export async function addTaskFiles(current: TaskFiles | undefined, taskId: string, scanIds: string[], bytes: number, by: string): Promise<void> {
+  const files: TaskFiles = {
+    taskId,
+    scanIds: [...(current?.scanIds || []), ...scanIds],
+    bytes: (current?.bytes || 0) + bytes,
+    addedBy: by,
+    addedAt: new Date().toISOString(),
+  };
+  await setDoc(ref(), { refs: { [taskId]: files } }, { merge: true });
+}
+
+/** Remove all of a task's tutor files (and their stored pages). */
+export async function deleteTaskFiles(files: TaskFiles): Promise<void> {
+  await deleteScanPages(files.scanIds);
+  await setDoc(ref(), { refs: { [files.taskId]: deleteField() } }, { merge: true });
 }

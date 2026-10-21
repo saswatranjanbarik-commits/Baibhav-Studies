@@ -13,6 +13,32 @@ Free-tier use: each finished stroke is one small save; a busy class uses a
 few hundred of Firestore's 20,000 free daily writes.
 
 ## What's new
+- **Fix — Next Event couldn't be edited:** every background save (even
+  Firestore's own tab bookkeeping) made pages reload their data, wiping what
+  was typed in the edit box. Now only real app data changes reload pages,
+  and the event form edits its own copy. When the event date has passed, the
+  card shows the next event from the Calendar (Exams first) or "Passed".
+- **Daily Plan & Log (one tab):** the Daily Log page now starts with the
+  day's plan — "Plan a session": first the type (Self study / Tutor class /
+  School / Play / Activity), then subject, chapter, optional topic — or the
+  play / activity — and the time. Each planned item: **✓ Done** logs it straight into the Daily Log
+  (Completed, with revisions as usual) or **Log details…** opens the log form
+  pre-filled. Plan items are the same records as the Study Plan page (one new
+  optional fields `logId`, `logType`, `activityDetail`). Menu item renamed
+  "Daily Plan & Log".
+- **Doubts:** a Doubts section on Daily Plan & Log — the student writes a
+  doubt for a subject (chapter/topic optional; 🎤 dictation works); choosing
+  "Have Doubt" when logging also asks for the doubt. Open doubts show as an
+  alert at the top of the Dashboard ("Answer doubts"); the tutor writes an
+  answer and marks it resolved; resolved doubts are kept below. New store key
+  `dugu_doubts`.
+- **Tasks — Scan / Photos / PDF / Audio / Link:** students submit work in any
+  of these ways; **Audio** records a voice answer in the browser (up to 10
+  min, ≈ 250 KB per minute). Tutors can **Attach files** to a task (also when
+  creating it): audio instructions, PDFs, photos, scans — shown to the
+  student as "From the tutor". Big files (long audio, PDFs up to ~6 MB) are
+  stored in pieces (`appStore/scan_<id>__1…`). Fixes the old "Upload PDF"
+  on new tasks, which saved only the file name.
 - **Sync fix (important):** when a device saved a list (e.g. tasks), its copy
   of EVERY item overwrote the cloud — so a device holding a slightly older
   copy could silently undo another person's change (this is how a submitted
@@ -138,6 +164,10 @@ src/components/classroom/YouTubePlayer.tsx, src/lib/youtube.ts, src/lib/dictatio
 src/components/DictationButton.tsx, src/lib/scans.ts, src/components/scan/ScanCapture.tsx,
 src/components/scan/ScanGallery.tsx, src/lib/submissions.ts, src/lib/scanGeometry.ts,
 src/lib/pdfBuilder.ts, src/lib/syncMerge.ts, src/pages/Dashboard.tsx,
+src/components/DayPlanCard.tsx, src/components/scan/AudioRecorder.tsx,
+src/lib/doubts.ts, src/components/DoubtsCard.tsx, src/lib/storeKeys.ts, src/lib/reminders.ts,
+src/components/ReminderScheduler.tsx, src/pages/StudyPlan.tsx,
+src/components/StoreSync.tsx, src/pages/DailyLog.tsx, src/components/Sidebar.tsx,
 src/components/classroom/ResizeHandle.tsx, src/components/classroom/LearningPanel.tsx,
 src/components/classroom/QuestionsPanel.tsx, src/components/classroom/FlashcardDeck.tsx,
 src/components/classroom/QuizRunner.tsx
