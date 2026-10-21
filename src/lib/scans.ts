@@ -25,13 +25,16 @@ export type ScanMode = 'document' | 'photo';
 
 export interface ScanPage {
   id: string;
-  kind: 'image' | 'pdf';
-  mime: string;              // image/jpeg | application/pdf
-  data: string;              // data URL
+  kind: 'image' | 'pdf' | 'audio';
+  mime: string;              // image/jpeg | application/pdf | audio/webm …
+  data: string;              // data URL (joined from its parts when loaded)
   width?: number;
   height?: number;
   bytes: number;             // length of data
-  name?: string;             // original file name (PDF)
+  name?: string;             // original file name (PDF / audio)
+  durationSec?: number;      // audio length
+  /** v1.5: big files are split over several documents (scan_<id>__1 …). */
+  parts?: number;
   by: string;
   byName: string;
   at: string;
@@ -40,6 +43,13 @@ export interface ScanPage {
 
 /** Stay well under Firestore's 1 MiB per-document limit. */
 export const MAX_DATA_CHARS = 900_000;
+/**
+ * Largest file (as text) — split over up to 10 documents. ≈ 6.5 MB file:
+ * a long audio recording or a bigger PDF.
+ */
+export const MAX_FILE_CHARS = MAX_DATA_CHARS * 10;
+/** Longest audio recording (seconds). */
+export const MAX_AUDIO_SECONDS = 10 * 60;
 /** Longest side of a saved page (pixels) — sharp enough to read handwriting. */
 export const MAX_SIDE = 1700; // default; see SCAN_SIZES
 export const MAX_PAGES = 20;
@@ -197,18 +207,30 @@ export function renderPage(img: HTMLImageElement, opts: RenderOptions): { data: 
   return { data: out, width: canvas.width, height: canvas.height };
 }
 
-/** Read a PDF file as a data URL (only small PDFs fit). */
-export function readPdf(file: File): Promise<string> {
+/** Read a file (PDF, audio) as a data URL — up to about 6.5 MB. */
+export function readFileData(file: Blob, name = 'The file'): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => {
       const data = String(r.result || '');
-      if (data.length > MAX_DATA_CHARS) reject(new Error(`"${file.name}" is too large (max about 650 KB). Scan the pages instead, or share it as a Google Drive link.`));
+      if (data.length > MAX_FILE_CHARS) reject(new Error(`"${name}" is too large (max about 6 MB). Share it as a Google Drive link instead.`));
       else resolve(data);
     };
-    r.onerror = () => reject(new Error('The PDF could not be read.'));
+    r.onerror = () => reject(new Error(`${name} could not be read.`));
     r.readAsDataURL(file);
   });
+}
+
+/** Read a PDF file as a data URL. */
+export function readPdf(file: File): Promise<string> {
+  return readFileData(file, file.name);
+}
+
+/** Split text into pieces of at most `size` characters. */
+export function splitIntoParts(text: string, size = MAX_DATA_CHARS): string[] {
+  const parts: string[] = [];
+  for (let i = 0; i < text.length; i += size) parts.push(text.slice(i, i + size));
+  return parts.length ? parts : [''];
 }
 
 /** Turn a data URL back into a file (for opening/downloading). */
@@ -226,36 +248,58 @@ export function dataUrlToBlob(dataUrl: string): Blob {
 // ---------------------------------------------------------------------------
 
 const scanRef = (id: string) => doc(db, STORE_COLLECTION, `scan_${id}`);
+const partRef = (id: string, i: number) => doc(db, STORE_COLLECTION, `scan_${id}__${i}`);
 const cache = new Map<string, ScanPage>();
 
+/**
+ * Save one page/file. Files bigger than one document are split: the extra
+ * pieces are saved first (scan_<id>__1, __2 …), then the main document with
+ * the first piece and `parts`, so a file is only "there" when complete.
+ */
 export async function saveScanPage(page: ScanPage): Promise<void> {
-  const clean: any = { ...page };
+  const pieces = splitIntoParts(page.data);
+  for (let i = 1; i < pieces.length; i++) {
+    await setDoc(partRef(page.id, i), { id: page.id, index: i, data: pieces[i] });
+  }
+  const clean: any = { ...page, data: pieces[0], parts: pieces.length > 1 ? pieces.length : undefined };
   Object.keys(clean).forEach((k) => clean[k] === undefined && delete clean[k]);
   await setDoc(scanRef(page.id), clean);
-  cache.set(page.id, page);
+  cache.set(page.id, { ...page, parts: pieces.length > 1 ? pieces.length : undefined });
 }
 
-/** Load one page (kept in memory after the first time). */
+/** Load one page/file, joining its pieces (kept in memory after the first time). */
 export async function loadScanPage(id: string): Promise<ScanPage | null> {
   if (cache.has(id)) return cache.get(id)!;
   const snap = await getDoc(scanRef(id));
   if (!snap.exists()) return null;
   const page = snap.data() as ScanPage;
+  if (page.parts && page.parts > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: page.parts - 1 }, (_, k) => getDoc(partRef(id, k + 1)).then((d) => (d.data()?.data as string) || '')),
+    );
+    page.data = page.data + rest.join('');
+  }
   cache.set(id, page);
   return page;
 }
 
-/** Delete pages (best effort — used when a submission or message is removed). */
+/** Delete pages/files with all their pieces (best effort). */
 export async function deleteScanPages(ids: string[] | undefined): Promise<void> {
-  await Promise.all((ids || []).map((id) => {
+  await Promise.all((ids || []).map(async (id) => {
+    let parts = cache.get(id)?.parts;
+    if (parts === undefined) {
+      try { parts = ((await getDoc(scanRef(id))).data()?.parts as number | undefined) || 1; } catch { parts = 1; }
+    }
     cache.delete(id);
-    return deleteDoc(scanRef(id)).catch((e) => console.warn('Could not delete scan', id, e));
+    const refs = [scanRef(id), ...Array.from({ length: Math.max(0, (parts || 1) - 1) }, (_, k) => partRef(id, k + 1))];
+    await Promise.all(refs.map((r) => deleteDoc(r).catch((e) => console.warn('Could not delete scan', id, e))));
   }));
 }
 
 /**
  * Put scanned pages into ONE PDF and download it (made on the device; the
- * stored pages stay as they are). Uploaded PDF files are downloaded as they are.
+ * stored pages stay as they are). Uploaded PDF files and audio recordings are
+ * downloaded as they are.
  */
 export async function downloadPagesAsPdf(scanIds: string[], fileName: string): Promise<number> {
   const pages = (await Promise.all(scanIds.map((id) => loadScanPage(id).catch(() => null)))).filter(Boolean) as ScanPage[];
@@ -276,5 +320,7 @@ export async function downloadPagesAsPdf(scanIds: string[], fileName: string): P
     save(new Blob([bytes as unknown as BlobPart], { type: 'application/pdf' }), `${safe}.pdf`);
   }
   pages.filter((p) => p.kind === 'pdf').forEach((p, i) => save(dataUrlToBlob(p.data), p.name || `${safe}-file-${i + 1}.pdf`));
+  // v1.5: audio recordings are downloaded as they are (alongside the PDF)
+  pages.filter((p) => p.kind === 'audio').forEach((p, i) => save(dataUrlToBlob(p.data), p.name || `${safe}-audio-${i + 1}.webm`));
   return pages.length;
 }

@@ -1,10 +1,10 @@
 /**
  * ScanGallery (v1.5) — shows scanned pages as thumbnails; tap one to open
  * the full-screen viewer (next/previous, zoom, rotate view, download).
- * PDFs open in a new tab.
+ * PDFs open in a new tab. Audio recordings get a play bar (v1.5).
  */
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCw, Download, FileText, Loader2, ImageOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCw, Download, FileText, Loader2, ImageOff, Music } from 'lucide-react';
 import { ScanPage, loadScanPage, dataUrlToBlob } from '../../lib/scans';
 
 interface Props {
@@ -38,10 +38,24 @@ export default function ScanGallery({ scanIds, compact, downloadName }: Props) {
   };
 
   const size = compact ? 'h-16 w-14' : 'h-28 w-24';
+  const audios = pages.map((p, i) => ({ p, i })).filter((x) => x.p && x.p.kind === 'audio') as { p: ScanPage; i: number }[];
   return (
     <>
+      {audios.length > 0 && (
+        <div className="space-y-1.5 mb-2">
+          {audios.map(({ p, i }) => (
+            <div key={scanIds[i]} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+              <Music className="h-4 w-4 text-indigo-600 shrink-0" />
+              <audio controls preload="metadata" src={p.data} className="flex-1 min-w-0 h-9" />
+              <a href={p.data} download={p.name || `audio-${i + 1}.webm`} className="p-1 text-slate-500 hover:text-slate-800" title="Download audio" aria-label="Download audio">
+                <Download className="h-4 w-4" />
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
-        {pages.map((p, i) => (
+        {pages.map((p, i) => (p && p.kind === 'audio') ? null : (
           <button
             key={scanIds[i]}
             onClick={() => p && (p.kind === 'pdf' ? openPdf(p) : setOpen(i))}

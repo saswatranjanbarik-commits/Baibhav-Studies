@@ -17,6 +17,9 @@ export default function Dashboard() {
   const [totalPoints, setTotalPoints] = React.useState(0);
   const [upcomingEvent, setUpcomingEvent] = React.useState({ name: 'Upcoming Event', date: toDateStr(new Date(new Date().getFullYear(), 11, 31)) });
   const [isEditingEvent, setIsEditingEvent] = React.useState(false);
+  // v1.5: the form edits a separate copy, so background updates can't overwrite typing.
+  const [eventDraft, setEventDraft] = React.useState({ name: '', date: '' });
+  const [calendarEvents, setCalendarEvents] = React.useState<any[]>([]);
   
   const [topicsLogged, setTopicsLogged] = React.useState(0);
   const [revisionsDue, setRevisionsDue] = React.useState(0);
@@ -48,7 +51,8 @@ export default function Dashboard() {
       
       // 2. Load Event
       const savedEvent = localStorage.getItem('dugu_upcoming_event');
-      if (savedEvent) setUpcomingEvent(JSON.parse(savedEvent));
+      if (savedEvent) { try { const ev = JSON.parse(savedEvent); if (ev && ev.date) setUpcomingEvent(ev); } catch { /* ignore */ } }
+      setCalendarEvents(readStore<any[]>(STORE_KEYS.events, []));
 
       // 4. Load Revisions
       const savedRevisions = localStorage.getItem(STORE_KEYS.revisions);
@@ -154,13 +158,32 @@ export default function Dashboard() {
     return () => window.removeEventListener('cloud_sync_update', load);
   }, []);
 
+  const openEventEditor = () => {
+    setEventDraft({ name: upcomingEvent.name, date: upcomingEvent.date });
+    setIsEditingEvent(true);
+  };
+
   const saveEvent = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('dugu_upcoming_event', JSON.stringify(upcomingEvent));
+    const ev = { name: eventDraft.name.trim(), date: eventDraft.date };
+    if (!ev.name || !ev.date) return;
+    setUpcomingEvent(ev);
+    localStorage.setItem('dugu_upcoming_event', JSON.stringify(ev));
     setIsEditingEvent(false);
   };
 
-  const daysLeft = Math.ceil((parseDateStr(upcomingEvent.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+  // v1.5: once the saved event has passed, show the next Exam (or other event)
+  // from the Calendar automatically, until a new one is set here.
+  const today = todayStr();
+  const savedIsPast = !!upcomingEvent.date && upcomingEvent.date < today;
+  const nextFromCalendar = savedIsPast
+    ? (Array.isArray(calendarEvents) ? calendarEvents : [])
+        .filter((ev: any) => ev && ev.date && ev.date >= today)
+        .sort((a: any, b: any) => (a.type === 'Exam' ? 0 : 1) - (b.type === 'Exam' ? 0 : 1) || a.date.localeCompare(b.date))[0]
+    : null;
+  const shownEvent = nextFromCalendar ? { name: nextFromCalendar.title, date: nextFromCalendar.date } : upcomingEvent;
+  const daysLeft = Math.round((parseDateStr(shownEvent.date).getTime() - parseDateStr(today).getTime()) / (1000 * 3600 * 24));
+  const eventPassed = !nextFromCalendar && savedIsPast;
 
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -177,20 +200,30 @@ export default function Dashboard() {
       {/* Exam Banner */}
       <div className="bg-[#1F4E79] rounded-xl p-4 text-white flex justify-between items-center mb-6 shadow-sm relative group">
         <div>
-          <div className="text-xs text-indigo-200 uppercase tracking-wider font-semibold mb-1">Next Event</div>
-          <div className="text-xl font-bold flex items-center gap-2">
-            📅 {upcomingEvent.name}
+          <div className="text-xs text-indigo-200 uppercase tracking-wider font-semibold mb-1">
+            {eventPassed ? 'Last event' : nextFromCalendar ? 'Next event (from Calendar)' : 'Next Event'}
           </div>
-          <div className="text-xs text-indigo-200 mt-1">{upcomingEvent.date}</div>
+          <div className="text-xl font-bold flex items-center gap-2">
+            📅 {shownEvent.name}
+          </div>
+          <div className="text-xs text-indigo-200 mt-1">{shownEvent.date}</div>
         </div>
         <div className="text-right flex items-center gap-4">
           <div className="text-right">
-            <div className="text-4xl font-black leading-none">{daysLeft > 0 ? daysLeft : 0}</div>
-            <div className="text-xs text-indigo-200 mt-1 font-medium">{daysLeft === 1 ? 'day left' : 'days left'}</div>
+            {eventPassed ? (
+              <div className="text-sm font-semibold text-indigo-100">Passed — set the next event ✎</div>
+            ) : daysLeft === 0 ? (
+              <div className="text-2xl font-black leading-none">Today</div>
+            ) : (
+              <>
+                <div className="text-4xl font-black leading-none">{daysLeft}</div>
+                <div className="text-xs text-indigo-200 mt-1 font-medium">{daysLeft === 1 ? 'day left' : 'days left'}</div>
+              </>
+            )}
           </div>
           {(currentUser?.role === 'Admin' || currentUser?.role === 'Teacher') && (
             <button
-              onClick={() => setIsEditingEvent(true)}
+              onClick={openEventEditor}
               className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors ml-4"
               title="Edit Upcoming Event"
             >
@@ -218,8 +251,8 @@ export default function Dashboard() {
                   <input
                     type="text"
                     required
-                    value={upcomingEvent.name}
-                    onChange={e => setUpcomingEvent({ ...upcomingEvent, name: e.target.value })}
+                    value={eventDraft.name}
+                    onChange={e => setEventDraft({ ...eventDraft, name: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                     placeholder="e.g. Term-I Exams"
                   />
@@ -229,8 +262,8 @@ export default function Dashboard() {
                   <input
                     type="date"
                     required
-                    value={upcomingEvent.date}
-                    onChange={e => setUpcomingEvent({ ...upcomingEvent, date: e.target.value })}
+                    value={eventDraft.date}
+                    onChange={e => setEventDraft({ ...eventDraft, date: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
